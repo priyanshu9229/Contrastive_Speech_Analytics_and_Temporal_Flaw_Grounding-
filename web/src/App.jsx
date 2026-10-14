@@ -12,6 +12,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X
 } from 'lucide-react'
 import WaveSurfer from 'wavesurfer.js'
@@ -117,12 +118,55 @@ function formatRange(start, end) {
   return `${m1}:${s1 < 10 ? '0' : ''}${s1}-${m2}:${s2 < 10 ? '0' : ''}${s2}`
 }
 
+export const DEFAULT_BASELINES = [
+  {
+    id: "stay_hungry",
+    title: "Stanford Commencement Address (2005)",
+    speaker: "Steve Jobs",
+    category: "Inspirational Keynote",
+    duration: 26.16,
+    transcript_path: "data/raw/stay_hungry.txt",
+    audio_url: "/static/raw/stay_hungry.wav",
+    transcript: "Your time is limited, so don't waste it living someone else's life. Don't be trapped by dogma, which is living with the results of other people's thinking. Don't let the noise of others' opinions drown out your own inner voice. And most important, have the courage to follow your heart and intuition. They somehow already know what you truly want to become. Stay hungry. Stay foolish."
+  },
+  {
+    id: "dream",
+    title: "I Have a Dream (1963)",
+    speaker: "Martin Luther King Jr.",
+    category: "Civil Rights Oratory",
+    duration: 21.12,
+    transcript_path: "data/raw/dream.txt",
+    audio_url: "/static/raw/dream.wav",
+    transcript: "I say to you today, my friends, so even though we face the difficulties of today and tomorrow, I still have a dream. It is a dream deeply rooted in the American dream. I have a dream that one day this nation will rise up and live out the true meaning of its creed: We hold these truths to be self-evident, that all men are created equal."
+  },
+  {
+    id: "moon",
+    title: "We Choose to go to the Moon (1962)",
+    speaker: "John F. Kennedy",
+    category: "Presidential Visionary",
+    duration: 16.22,
+    transcript_path: "data/raw/moon.txt",
+    audio_url: "/static/raw/moon.wav",
+    transcript: "We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard, because that goal will serve to organize and measure the best of our energies and skills, because that challenge is one that we are willing to accept, one we are unwilling to postpone, and one which we intend to win."
+  },
+  {
+    id: "beaches",
+    title: "We Shall Fight on the Beaches (1940)",
+    speaker: "Winston Churchill",
+    category: "Wartime Address",
+    duration: 21.7,
+    transcript_path: "data/raw/beaches.txt",
+    audio_url: "/static/raw/beaches.wav",
+    transcript: "We shall go on to the end, we shall fight in France, we shall fight on the seas and oceans, we shall fight with growing confidence and growing strength in the air, we shall defend our island, whatever the cost may be. We shall fight on the beaches, we shall fight on the landing grounds, we shall fight in the fields and in the streets, we shall fight in the hills; we shall never surrender."
+  }
+]
+
 export default function App() {
-  const [baselines, setBaselines] = useState([])
+  const [baselines, setBaselines] = useState(DEFAULT_BASELINES)
   const [selectedBaseline, setSelectedBaseline] = useState('stay_hungry')
   const [audioFile, setAudioFile] = useState(null)
   const [audioUrl, setAudioUrl] = useState(null)
-  const [transcript, setTranscript] = useState('')
+  const [transcript, setTranscript] = useState(DEFAULT_BASELINES[0].transcript)
   const [loading, setLoading] = useState(false)
   const [analysisData, setAnalysisData] = useState(null)
   const [error, setError] = useState(null)
@@ -136,6 +180,9 @@ export default function App() {
   const [activeFlawIndex, setActiveFlawIndex] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
 
+  // Active baseline data object
+  const selectedBaselineData = baselines.find(b => b.id === selectedBaseline) || DEFAULT_BASELINES.find(b => b.id === selectedBaseline) || DEFAULT_BASELINES[0]
+
   // DOM Refs
   const waveContainerRef = useRef(null)
   const timelineContainerRef = useRef(null)
@@ -145,26 +192,29 @@ export default function App() {
   const energyChartRef = useRef(null)
   const rateChartRef = useRef(null)
 
-  // Fetch baseline speeches on mount
+  // Fetch baseline speeches on mount (updates dynamically from backend)
   useEffect(() => {
     fetch(`${API_BASE}/baselines`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
       .then(data => {
-        setBaselines(data)
-        if (data.length > 0) {
-          setSelectedBaseline(data[0].id)
-          setTranscript(data[0].transcript || '')
+        if (Array.isArray(data) && data.length > 0) {
+          setBaselines(data)
         }
       })
-      .catch(err => console.error('Failed to load baselines:', err))
+      .catch(err => {
+        console.warn('Backend /baselines fetch failed; using built-in reference baselines:', err)
+      })
   }, [])
 
   const handleBaselineChange = (e) => {
     const bId = e.target.value
     setSelectedBaseline(bId)
-    const found = baselines.find(b => b.id === bId)
-    if (found) {
-      setTranscript(found.transcript || '')
+    const found = baselines.find(b => b.id === bId) || DEFAULT_BASELINES.find(b => b.id === bId)
+    if (found && found.transcript) {
+      setTranscript(found.transcript)
     }
   }
 
@@ -524,21 +574,34 @@ export default function App() {
           )}
 
           {/* Reference Baseline Select */}
-          <div className="space-y-1 shrink-0">
-            <label className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1] block">
-              Reference Baseline
-            </label>
-            <select
-              value={selectedBaseline}
-              onChange={handleBaselineChange}
-              className="w-full bg-[#0E1116] border border-[#2A333E] rounded px-2.5 py-1.5 text-xs text-[#E6EAF0] focus:outline-none focus:border-[#2FBF9B] cursor-pointer"
-            >
-              {baselines.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.speaker} — {b.title}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-1.5 shrink-0">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
+              <span className="font-semibold text-[#E6EAF0]">Reference Baseline</span>
+              <span className="text-[#2FBF9B] text-[10px]">4 Speeches</span>
+            </div>
+            <div className="relative">
+              <select
+                value={selectedBaseline}
+                onChange={handleBaselineChange}
+                className="w-full bg-[#0E1116] border border-[#2A333E] rounded px-3 py-2 text-xs text-[#E6EAF0] focus:outline-none focus:border-[#2FBF9B] cursor-pointer appearance-none pr-8 font-medium shadow-sm hover:border-[#3B4756] transition-colors"
+              >
+                {baselines.map(b => (
+                  <option key={b.id} value={b.id} className="bg-[#151A21] text-[#E6EAF0] py-1.5">
+                    {b.speaker} — {b.title}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[#9AA5B1]">
+                <ChevronDown className="h-4 w-4" />
+              </div>
+            </div>
+            {/* Active Reference Badge */}
+            {selectedBaselineData && (
+              <div className="flex items-center justify-between text-[11px] text-[#2FBF9B] font-mono bg-[#2FBF9B]/10 border border-[#2FBF9B]/25 rounded px-2.5 py-1.5 mt-1">
+                <span className="font-semibold">{selectedBaselineData.speaker}</span>
+                <span className="text-[#9AA5B1] text-[10px]">{selectedBaselineData.category}</span>
+              </div>
+            )}
           </div>
 
           {/* Transcript Textarea (Flexes to fill remaining height) */}
@@ -671,7 +734,7 @@ export default function App() {
                       <span className="w-3 h-0.5 bg-[#2FBF9B]"></span> Participant
                     </span>
                     <span className="flex items-center gap-1.5 text-[#8B96A3]">
-                      <span className="w-3 h-0.5 border-t border-dashed border-[#8B96A3]"></span> Baseline Reference
+                      <span className="w-3 h-0.5 border-t border-dashed border-[#8B96A3]"></span> Reference ({selectedBaselineData.speaker})
                     </span>
                   </div>
                 </div>
@@ -770,6 +833,9 @@ export default function App() {
                   <div className="flex items-baseline justify-between">
                     <span className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
                       Overall Score
+                    </span>
+                    <span className="text-[10px] font-mono text-[#2FBF9B] bg-[#2FBF9B]/10 px-1.5 py-0.5 rounded border border-[#2FBF9B]/20">
+                      Ref: {selectedBaselineData.speaker}
                     </span>
                   </div>
 
