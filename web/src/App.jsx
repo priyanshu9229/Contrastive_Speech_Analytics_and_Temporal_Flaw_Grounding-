@@ -19,13 +19,16 @@ import WaveSurfer from 'wavesurfer.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js'
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import Plotly from 'plotly.js-dist-min'
+import demoData from './demoData.json'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
 // Resilient API fetch that automatically falls back across origins (localhost vs 127.0.0.1)
 async function apiFetch(endpoint, options = {}) {
+  const custom = typeof window !== 'undefined' ? localStorage.getItem('speechflaw_api_url') : ''
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   const candidates = [
+    custom,
     import.meta.env.VITE_API_URL,
     isLocal ? `http://${window.location.hostname}:8000` : null,
     'http://127.0.0.1:8000',
@@ -246,18 +249,33 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
-      const { res, host } = await apiFetch('/demo')
-      if (!res.ok) throw new Error('Could not load sample benchmark.')
-      const data = await res.json()
-      setAnalysisData(data)
-      setTranscript(data.words.map(w => w.word).join(' '))
-      const fullAudioUrl = `${host}${data.audio_url}?t=${Date.now()}`
-      setAudioUrl(fullAudioUrl)
-      setAudioFile({ name: 'demo_stay_hungry_l3.wav', size: 759862 })
+      // 1. Try fetching from live backend
+      try {
+        const { res, host } = await apiFetch('/demo')
+        if (res.ok) {
+          const data = await res.json()
+          setAnalysisData(data)
+          if (data.words && data.words.length > 0) {
+            setTranscript(data.words.map(w => w.word).join(' '))
+          }
+          const fullAudioUrl = `${host}${data.audio_url}?t=${Date.now()}`
+          setAudioUrl(fullAudioUrl)
+          setAudioFile({ name: 'demo_stay_hungry_l3.wav', size: 759862 })
+          return
+        }
+      } catch (backendErr) {
+        console.warn('Backend API /demo unreachable, activating bundled sample fallback:', backendErr)
+      }
+
+      // 2. Bundled fallback: loads immediately on Vercel/Netlify without backend
+      setAnalysisData(demoData)
+      if (demoData.words && demoData.words.length > 0) {
+        setTranscript(demoData.words.map(w => w.word).join(' '))
+      }
+      setAudioUrl('/demo_sample.wav')
+      setAudioFile({ name: 'demo_stay_hungry_l1.wav', size: 863858 })
     } catch (err) {
-      setError(err.message.includes('fetch') || err.message.includes('Failed to')
-        ? 'Cannot connect to backend server. Please verify the Python API is running on port 8000.'
-        : err.message)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -294,9 +312,14 @@ export default function App() {
         setAudioUrl(fullAudioUrl)
       }
     } catch (err) {
-      setError(err.message.includes('fetch') || err.message.includes('Failed to')
-        ? 'Cannot connect to backend server at http://127.0.0.1:8000. Please verify the Python API is running.'
-        : err.message)
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+      if (isHttps) {
+        setError('Cannot connect to local backend from HTTPS. Modern browsers block HTTPS sites (Vercel) from connecting to http://127.0.0.1:8000 (Mixed Content). Open http://localhost:5173 locally, or click "Load sample" above.')
+      } else {
+        setError(err.message.includes('fetch') || err.message.includes('Failed to')
+          ? 'Cannot connect to backend server at http://127.0.0.1:8000. Please verify the Python API is running.'
+          : err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -648,8 +671,32 @@ export default function App() {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] p-2 rounded text-[11px] font-mono shrink-0">
-              {error}
+            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] p-2.5 rounded text-[11px] font-mono shrink-0 space-y-1.5">
+              <div className="flex items-start space-x-1.5">
+                <AlertCircle className="h-4 w-4 shrink-0 text-[#EF4444] mt-0.5" />
+                <span className="leading-snug">{error}</span>
+              </div>
+              {typeof window !== 'undefined' && window.location.protocol === 'https:' && (
+                <div className="text-[10px] text-[#9AA5B1] bg-[#0E1116] p-2 rounded border border-[#2A333E] space-y-1">
+                  <p className="font-semibold text-[#E6EAF0]">💡 Running on Vercel / HTTPS?</p>
+                  <p>Browsers block HTTPS sites from connecting to local <code className="text-[#2FBF9B]">http://127.0.0.1:8000</code> (Mixed Content policy).</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href="http://localhost:5173"
+                      className="px-2 py-1 bg-[#2FBF9B] text-[#0E1116] rounded font-bold hover:bg-[#28A787] text-[10px]"
+                    >
+                      Open Localhost:5173
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleLoadDemo}
+                      className="px-2 py-1 bg-[#1C232C] border border-[#2A333E] text-[#E6EAF0] rounded hover:border-[#2FBF9B] text-[10px] cursor-pointer"
+                    >
+                      Load Sample Demo
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
