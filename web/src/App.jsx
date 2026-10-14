@@ -21,15 +21,17 @@ import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import Plotly from 'plotly.js-dist-min'
 import demoData from './demoData.json'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const PUBLIC_TUNNEL_URL = 'https://5c6ef9a8b330e1.lhr.life'
+const API_BASE = import.meta.env.VITE_API_URL || PUBLIC_TUNNEL_URL
 
-// Resilient API fetch that automatically falls back across origins (localhost vs 127.0.0.1)
+// Resilient API fetch that automatically falls back across origins (custom -> env -> public tunnel -> localhost)
 async function apiFetch(endpoint, options = {}) {
-  const custom = typeof window !== 'undefined' ? localStorage.getItem('speechflaw_api_url') : ''
+  const custom = typeof window !== 'undefined' ? (localStorage.getItem('speechflaw_api_url') || '').trim().replace(/\/+$/, '') : ''
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   const candidates = [
     custom,
     import.meta.env.VITE_API_URL,
+    PUBLIC_TUNNEL_URL,
     isLocal ? `http://${window.location.hostname}:8000` : null,
     'http://127.0.0.1:8000',
     'http://localhost:8000'
@@ -45,7 +47,7 @@ async function apiFetch(endpoint, options = {}) {
       lastError = err
     }
   }
-  throw lastError || new Error('Failed to connect to backend analytics server at http://127.0.0.1:8000')
+  throw lastError || new Error(`Failed to connect to backend analytics server (tried ${candidates.join(', ')})`)
 }
 
 // Colorblind-safe category colors
@@ -205,6 +207,10 @@ export default function App() {
   const [hoveredFlawIndex, setHoveredFlawIndex] = useState(null)
   const [activeFlawIndex, setActiveFlawIndex] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [apiHost, setApiHost] = useState(PUBLIC_TUNNEL_URL)
+  const [apiOnline, setApiOnline] = useState(true)
+  const [customUrlInput, setCustomUrlInput] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('speechflaw_api_url') || '' : ''))
+  const [isUrlSaved, setIsUrlSaved] = useState(false)
 
   // Active baseline data object
   const selectedBaselineData = baselines.find(b => b.id === selectedBaseline) || DEFAULT_BASELINES.find(b => b.id === selectedBaseline) || DEFAULT_BASELINES[0]
@@ -221,8 +227,10 @@ export default function App() {
   // Fetch baseline speeches on mount (updates dynamically from backend)
   useEffect(() => {
     apiFetch('/baselines')
-      .then(({ res }) => {
+      .then(({ res, host }) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        if (host) setApiHost(host)
+        setApiOnline(true)
         return res.json()
       })
       .then(data => {
@@ -232,6 +240,7 @@ export default function App() {
       })
       .catch(err => {
         console.warn('Backend /baselines fetch failed; using built-in reference baselines:', err)
+        setApiOnline(false)
       })
   }, [])
 
@@ -301,6 +310,8 @@ export default function App() {
         method: 'POST',
         body: formData,
       })
+      if (host) setApiHost(host)
+      setApiOnline(true)
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}))
         throw new Error(errJson.detail || 'Analysis could not be completed.')
@@ -312,14 +323,10 @@ export default function App() {
         setAudioUrl(fullAudioUrl)
       }
     } catch (err) {
-      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-      if (isHttps) {
-        setError('Cannot connect to local backend from HTTPS. Modern browsers block HTTPS sites (Vercel) from connecting to http://127.0.0.1:8000 (Mixed Content). Open http://localhost:5173 locally, or click "Load sample" above.')
-      } else {
-        setError(err.message.includes('fetch') || err.message.includes('Failed to')
-          ? 'Cannot connect to backend server at http://127.0.0.1:8000. Please verify the Python API is running.'
-          : err.message)
-      }
+      setApiOnline(false)
+      setError(err.message.includes('fetch') || err.message.includes('Failed to')
+        ? `Cannot connect to backend server (${apiHost}). Please ensure the backend is running, configure your URL in Info, or click "Load sample" above.`
+        : err.message)
     } finally {
       setLoading(false)
     }
@@ -519,8 +526,21 @@ export default function App() {
           </span>
         </div>
 
-        {/* Right: Load Sample & Info Popover */}
+        {/* Right: Load Sample, Backend Status & Info Popover */}
         <div className="flex items-center space-x-2">
+          {/* Active Backend Connection Indicator */}
+          <div 
+            onClick={() => setShowHelp(true)}
+            className="flex items-center space-x-1.5 px-2 py-1 rounded bg-[#1C232C] hover:bg-[#2A333E] border border-[#2A333E] text-[11px] font-mono cursor-pointer transition-colors"
+            title={`Active Backend: ${apiHost}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${apiOnline ? 'bg-[#2FBF9B] animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-[#9AA5B1] hidden md:inline">API:</span>
+            <span className="text-[#E6EAF0] truncate max-w-[130px]">
+              {apiHost ? apiHost.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : 'offline'}
+            </span>
+          </div>
+
           <button
             onClick={handleLoadDemo}
             disabled={loading}
@@ -533,16 +553,16 @@ export default function App() {
           <div className="relative">
             <button
               onClick={() => setShowHelp(!showHelp)}
-              title="Pipeline Info & GitHub"
+              title="Pipeline Info & Backend Configuration"
               className="p-1 rounded text-[#9AA5B1] hover:text-[#E6EAF0] hover:bg-[#1C232C] transition-colors cursor-pointer"
             >
               <Info className="h-4 w-4" />
             </button>
 
             {showHelp && (
-              <div className="absolute right-0 mt-2 w-72 bg-[#151A21] border border-[#2A333E] rounded p-3 text-xs shadow-xl z-50">
+              <div className="absolute right-0 mt-2 w-80 bg-[#151A21] border border-[#2A333E] rounded p-3 text-xs shadow-xl z-50">
                 <div className="flex items-center justify-between border-b border-[#2A333E] pb-1.5 mb-2">
-                  <span className="font-semibold text-[#E6EAF0]">Pipeline Details</span>
+                  <span className="font-semibold text-[#E6EAF0]">Pipeline & Backend Status</span>
                   <button onClick={() => setShowHelp(false)} className="text-[#9AA5B1] hover:text-[#E6EAF0]">
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -550,6 +570,47 @@ export default function App() {
                 <p className="text-[#9AA5B1] leading-relaxed mb-2.5">
                   SpeechFlow extracts continuous acoustic features (log-F0 semitones, RMS dB, local rate) with 10ms frame hops and performs dynamic time warping (DTW) registration against reference baselines.
                 </p>
+                
+                {/* Live Backend Connection Card */}
+                <div className="mb-2.5 p-2 rounded bg-[#0E1116] border border-[#2A333E] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#9AA5B1]">Live Backend:</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono ${apiOnline ? 'bg-[#2FBF9B]/15 text-[#2FBF9B]' : 'bg-amber-400/15 text-amber-400'}`}>
+                      {apiOnline ? 'Online (Public HTTPS)' : 'Offline / Standalone'}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[10px] text-[#E6EAF0] truncate" title={apiHost}>
+                    {apiHost}
+                  </div>
+                  <div className="pt-1">
+                    <label className="text-[10px] text-[#9AA5B1] block mb-1">Custom API URL (optional):</label>
+                    <div className="flex space-x-1">
+                      <input
+                        type="text"
+                        placeholder="https://your-backend.onrender.com"
+                        value={customUrlInput}
+                        onChange={(e) => { setCustomUrlInput(e.target.value); setIsUrlSaved(false); }}
+                        className="w-full px-2 py-0.5 text-[10px] bg-[#151A21] border border-[#2A333E] rounded text-[#E6EAF0] focus:outline-none focus:border-[#2FBF9B]"
+                      />
+                      <button
+                        onClick={() => {
+                          if (customUrlInput.trim()) {
+                            localStorage.setItem('speechflaw_api_url', customUrlInput.trim())
+                          } else {
+                            localStorage.removeItem('speechflaw_api_url')
+                          }
+                          setIsUrlSaved(true)
+                          setTimeout(() => window.location.reload(), 400)
+                        }}
+                        className="px-2 py-0.5 text-[10px] bg-[#2A333E] hover:bg-[#3E4C5A] rounded text-[#E6EAF0] transition-colors"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    {isUrlSaved && <span className="text-[10px] text-[#2FBF9B] block mt-0.5">Saved! Reloading...</span>}
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 font-mono text-[11px] border-t border-[#2A333E] pt-2">
                   <a
                     href="https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-"
@@ -561,7 +622,7 @@ export default function App() {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                   <a
-                    href="http://127.0.0.1:8000/docs"
+                    href={`${apiHost}/docs`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-[#9AA5B1] hover:text-[#E6EAF0] flex items-center justify-between"
@@ -570,7 +631,7 @@ export default function App() {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                   <div className="text-[10px] text-[#9AA5B1] pt-1">
-                    Team: Priyanshu, Aarav, Rohan, Ananya
+                    Team Cheetah: Priyanshu, Prince, Pratham, Pradhan
                   </div>
                 </div>
               </div>
