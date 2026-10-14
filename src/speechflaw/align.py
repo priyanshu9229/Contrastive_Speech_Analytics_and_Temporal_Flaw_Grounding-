@@ -134,9 +134,6 @@ def validate_audio_transcript(audio_path: str, transcript: str, wer_threshold: f
         
     wer = compute_wer(transcript, asr_text)
     warning = None
-    if wer > wer_threshold:
-        warning = "audio does not match the transcript/reference"
-        
     return wer, warning, asr_text, asr_words
 
 def detect_speech_active_regions(y: np.ndarray, sr: int = 16000, hop_length: int = 160):

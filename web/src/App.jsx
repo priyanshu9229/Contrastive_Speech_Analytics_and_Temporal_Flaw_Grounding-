@@ -659,17 +659,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Yellow Warning Banner above charts when mismatch warning is returned */}
-              {analysisData?.warning && (
-                <div data-testid="warning-banner" className="mx-2 mt-2 bg-[#F0E442]/15 border border-[#F0E442]/40 rounded px-3 py-2 flex items-center space-x-2 text-[#F0E442] text-xs font-mono shrink-0">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-[#F0E442]" />
-                  <span className="font-semibold uppercase tracking-wider">Warning:</span>
-                  <span>{analysisData.warning}</span>
-                  {analysisData.wer !== undefined && (
-                    <span className="text-[#9AA5B1] ml-auto">WER: {(analysisData.wer * 100).toFixed(1)}%</span>
-                  )}
-                </div>
-              )}
 
               {/* Stacked Plotly Charts Container */}
               <div className="flex-1 flex flex-col px-2 pb-2 space-y-1">

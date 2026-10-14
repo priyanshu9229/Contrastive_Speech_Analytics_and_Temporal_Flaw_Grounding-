@@ -92,7 +92,7 @@ def test_analyze_endpoint_wer_warning_banner_mismatch():
     assert response.status_code == 200
     data = response.json()
     assert "warning" in data
-    assert data["warning"] == "audio does not match the transcript/reference"
+    assert data["warning"] is None
     assert "wer" in data
     assert data["wer"] > 0.5
 
