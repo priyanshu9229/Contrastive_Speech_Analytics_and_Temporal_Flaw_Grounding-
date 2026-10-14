@@ -58,7 +58,7 @@ const FLAW_TYPES = {
   monotone: {
     label: 'Monotone Pitch',
     badge: 'bg-purple-50 text-purple-700 border-purple-200',
-    color: '#8B5CF6',
+    color: '#64748B',
     bg: '#FAF5FF',
     simpleExplain: 'Your voice stayed flat without pitch inflection or enthusiasm.',
     simpleTip: 'Raise your pitch slightly on key nouns and emphasized verbs.'
@@ -160,7 +160,7 @@ export default function App() {
   const handleAnalyze = async (e) => {
     if (e) e.preventDefault()
     if (!audioFile) {
-      setError('Please choose an audio file first, or click "Try Sample Audio".')
+      setError('Please choose an audio file first, or click "Load sample".')
       return
     }
 
@@ -253,7 +253,7 @@ export default function App() {
           
           {/* Logo & Project Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5B4DFB] flex items-center justify-center text-white shadow-sm">
+            <div className="w-9 h-9 rounded-xl bg-[#315B50] flex items-center justify-center text-white shadow-sm">
               <Mic className="h-5 w-5" />
             </div>
             <div>
@@ -261,16 +261,15 @@ export default function App() {
                 SpeechFlaw
               </span>
               <span className="text-xs text-slate-500 block -mt-0.5">
-                Speech & Delivery Analyzer
+                Speech analysis tool
               </span>
             </div>
           </div>
 
           {/* Simple Navigation Links */}
           <nav className="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-600">
-            <span className="text-[#5B4DFB]">Analyzer</span>
-            <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How It Works</a>
-            <a href="#team" className="hover:text-slate-900 transition-colors">Team</a>
+            <span className="text-[#315B50]">Analyzer</span>
+            <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How it works</a>
             <a
               href="https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-"
               target="_blank"
@@ -287,9 +286,9 @@ export default function App() {
             <button
               onClick={handleLoadDemo}
               disabled={loading}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F0EFFF] text-[#5B4DFB] hover:bg-[#E4E1FF] transition-colors cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#EEF3EF] text-[#315B50] hover:bg-[#DDE8E0] transition-colors cursor-pointer disabled:opacity-50"
             >
-              Try Sample Audio
+              Load sample
             </button>
           </div>
         </div>
@@ -298,22 +297,22 @@ export default function App() {
       {/* Simple, Human Hero Section */}
       <section className="pt-8 pb-5 px-4 text-center max-w-3xl mx-auto">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-          Analyze Your Speech in Seconds
+          Speech analysis
         </h1>
         <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl mx-auto">
-          Upload any speech recording to get clear feedback on your pacing, pauses, pitch variation, and volume.
+          Compare your recording with a reference and review pacing, pauses, pitch and volume.
         </p>
 
         {/* Clean, simple benefit tags */}
         <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs text-slate-600 font-medium">
           <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            🎧 Supports .m4a, .mp3, .wav
+            Supports M4A, MP3 and WAV
           </span>
           <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            ⚡ Instant pacing & rhythm check
+            Pacing and rhythm
           </span>
           <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            🎯 Timeline playback & tips
+            Playback with feedback
           </span>
         </div>
       </section>
@@ -347,18 +346,18 @@ export default function App() {
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col gap-4">
               
               <h2 className="font-bold text-slate-900 text-base">
-                1. Upload Speech Audio
+                Upload recording
               </h2>
 
               {/* Clean Upload Drop Area */}
-              <label className="border-2 border-dashed border-slate-300 hover:border-[#5B4DFB] bg-slate-50 hover:bg-[#F0EFFF]/30 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group">
+              <label className="border-2 border-dashed border-slate-300 hover:border-[#315B50] bg-slate-50 hover:bg-[#EEF3EF]/30 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group">
                 <input
                   type="file"
                   accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg,.flac"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 group-hover:border-[#5B4DFB] text-[#5B4DFB] flex items-center justify-center mb-2.5 shadow-2xs">
+                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 group-hover:border-[#315B50] text-[#315B50] flex items-center justify-center mb-2.5 shadow-2xs">
                   <UploadCloud className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-semibold text-slate-800">
@@ -373,7 +372,7 @@ export default function App() {
               {audioFile && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
                   <div className="flex items-center space-x-2.5 overflow-hidden">
-                    <FileAudio className="w-5 h-5 text-[#5B4DFB] shrink-0" />
+                    <FileAudio className="w-5 h-5 text-[#315B50] shrink-0" />
                     <div className="truncate">
                       <p className="text-xs font-bold text-slate-800 truncate">{audioFile.name}</p>
                       <p className="text-[11px] text-slate-500">{(audioFile.size / (1024 * 1024)).toFixed(1)} MB • Ready to analyze</p>
@@ -388,12 +387,12 @@ export default function App() {
               {/* Step 2: Compare against reference */}
               <div className="space-y-1 pt-1">
                 <label className="text-xs font-bold text-slate-800">
-                  2. Compare against reference speech:
+                  Reference recording
                 </label>
                 <select
                   value={selectedBaseline}
                   onChange={handleBaselineChange}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-[#5B4DFB] cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-[#315B50] cursor-pointer"
                 >
                   {baselines.map(b => (
                     <option key={b.id} value={b.id}>
@@ -406,14 +405,14 @@ export default function App() {
               {/* Step 3: Transcript (Simple / Collapsible) */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-800">
-                  3. Spoken text (optional):
+                  Transcript (optional)
                 </label>
                 <textarea
                   rows={2}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                   placeholder="Transcript for word-by-word alignment..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-[#5B4DFB] resize-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-[#315B50] resize-none"
                 />
               </div>
 
@@ -421,7 +420,7 @@ export default function App() {
               <button
                 onClick={handleAnalyze}
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#315B50] hover:bg-[#26483F] text-white transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -429,7 +428,7 @@ export default function App() {
                     <span>Analyzing your recording...</span>
                   </>
                 ) : (
-                  <span>Analyze Speech</span>
+                  <span>Analyze recording</span>
                 )}
               </button>
 
@@ -438,9 +437,9 @@ export default function App() {
                 <button
                   onClick={handleLoadDemo}
                   disabled={loading}
-                  className="text-xs font-semibold text-[#5B4DFB] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[#315B50] hover:underline cursor-pointer"
                 >
-                  No audio on hand? Click here to test sample audio
+                  Or load a sample recording
                 </button>
               </div>
 
@@ -448,18 +447,18 @@ export default function App() {
 
             {/* Simple "How it Works" Card */}
             <div id="how-it-works" className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs text-xs">
-              <h3 className="font-bold text-slate-900 mb-2">How It Works</h3>
+              <h3 className="font-bold text-slate-900 mb-2">How it works</h3>
               <ul className="space-y-1.5 text-slate-600">
                 <li className="flex items-start gap-1.5">
-                  <span className="text-[#5B4DFB] font-bold">1.</span>
+                  <span className="text-[#315B50] font-bold">1.</span>
                   <span>Aligns your recording with the standard speech using non-linear audio warping.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="text-[#5B4DFB] font-bold">2.</span>
+                  <span className="text-[#315B50] font-bold">2.</span>
                   <span>Measures tempo shifts, silence gaps, pitch range, and volume consistency.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="text-[#5B4DFB] font-bold">3.</span>
+                  <span className="text-[#315B50] font-bold">3.</span>
                   <span>Pinpoints exact seconds where delivery drifted and provides coaching advice.</span>
                 </li>
               </ul>
@@ -494,7 +493,7 @@ export default function App() {
                           key={rate}
                           onClick={() => changePlaybackRate(rate)}
                           className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                            playbackRate === rate ? 'bg-[#5B4DFB] text-white' : 'text-slate-600 hover:text-slate-900'
+                            playbackRate === rate ? 'bg-[#315B50] text-white' : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
                           {rate}x
@@ -507,7 +506,7 @@ export default function App() {
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={togglePlay}
-                      className="w-10 h-10 rounded-full bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white flex items-center justify-center shrink-0 cursor-pointer shadow-sm transition-transform active:scale-95"
+                      className="w-10 h-10 rounded-full bg-[#315B50] hover:bg-[#26483F] text-white flex items-center justify-center shrink-0 cursor-pointer shadow-sm transition-transform active:scale-95"
                     >
                       {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 ml-0.5 fill-current" />}
                     </button>
@@ -539,7 +538,7 @@ export default function App() {
                             onMouseEnter={() => setActiveFlawHover(idx)}
                             onMouseLeave={() => setActiveFlawHover(null)}
                             className={`absolute top-0 bottom-0 border-x transition-all z-10 ${
-                              isHovered ? 'ring-2 ring-[#5B4DFB]' : ''
+                              isHovered ? 'ring-2 ring-[#315B50]' : ''
                             }`}
                             style={{
                               left: `${leftPct}%`,
@@ -554,10 +553,10 @@ export default function App() {
 
                       {/* Playhead */}
                       <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-[#5B4DFB] z-20 pointer-events-none"
+                        className="absolute top-0 bottom-0 w-0.5 bg-[#315B50] z-20 pointer-events-none"
                         style={{ left: `${(currentTime / maxTime) * 100}%` }}
                       >
-                        <div className="w-2.5 h-2.5 -ml-1 rounded-full bg-[#5B4DFB] -mt-0.5"></div>
+                        <div className="w-2.5 h-2.5 -ml-1 rounded-full bg-[#315B50] -mt-0.5"></div>
                       </div>
                     </div>
                   </div>
@@ -573,7 +572,7 @@ export default function App() {
                     onClick={() => setActiveTab('scores')}
                     className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                       activeTab === 'scores'
-                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        ? 'border-[#315B50] text-[#315B50]'
                         : 'border-transparent text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -585,7 +584,7 @@ export default function App() {
                     onClick={() => setActiveTab('flaws')}
                     className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                       activeTab === 'flaws'
-                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        ? 'border-[#315B50] text-[#315B50]'
                         : 'border-transparent text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -597,7 +596,7 @@ export default function App() {
                     onClick={() => setActiveTab('charts')}
                     className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                       activeTab === 'charts'
-                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        ? 'border-[#315B50] text-[#315B50]'
                         : 'border-transparent text-slate-500 hover:text-slate-900'
                     }`}
                   >
@@ -612,8 +611,8 @@ export default function App() {
                     {/* Big Score Card */}
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 rounded-xl bg-white border-2 border-[#5B4DFB] flex flex-col items-center justify-center shrink-0 shadow-2xs">
-                          <span className="text-2xl font-black text-[#5B4DFB] leading-none">
+                        <div className="w-16 h-16 rounded-xl bg-white border-2 border-[#315B50] flex flex-col items-center justify-center shrink-0 shadow-2xs">
+                          <span className="text-2xl font-black text-[#315B50] leading-none">
                             {analysisData.scores.overall}
                           </span>
                           <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">/ 100</span>
@@ -706,7 +705,7 @@ export default function App() {
                             onMouseEnter={() => setActiveFlawHover(idx)}
                             onMouseLeave={() => setActiveFlawHover(null)}
                             className={`p-3.5 rounded-xl border transition-all cursor-pointer bg-slate-50 hover:bg-white ${
-                              isHovered ? 'ring-2 ring-[#5B4DFB] border-[#5B4DFB]' : 'border-slate-200'
+                              isHovered ? 'ring-2 ring-[#315B50] border-[#315B50]' : 'border-slate-200'
                             }`}
                           >
                             <div className="flex items-center justify-between mb-1.5">
@@ -722,7 +721,7 @@ export default function App() {
                                     e.stopPropagation()
                                     seekToTime(flaw.start)
                                   }}
-                                  className="text-xs font-bold text-[#5B4DFB] hover:underline"
+                                  className="text-xs font-bold text-[#315B50] hover:underline"
                                 >
                                   ▶ Listen
                                 </button>
@@ -739,8 +738,8 @@ export default function App() {
                               {cfg.simpleExplain || flaw.perceptual_impact}
                             </p>
 
-                            <div className="bg-[#F0EFFF] border border-indigo-100 p-2.5 rounded-lg text-xs text-indigo-900 flex items-start gap-1.5">
-                              <span className="font-bold text-[#5B4DFB]">Tip:</span>
+                            <div className="bg-[#EEF3EF] border border-indigo-100 p-2.5 rounded-lg text-xs text-indigo-900 flex items-start gap-1.5">
+                              <span className="font-bold text-[#315B50]">Tip:</span>
                               <span>{cfg.simpleTip || flaw.actionable_tip}</span>
                             </div>
                           </div>
@@ -756,8 +755,8 @@ export default function App() {
                     <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
                       <span className="text-slate-500">Compare your trajectory against the reference:</span>
                       <div className="flex items-center space-x-3 font-semibold">
-                        <span className="flex items-center gap-1 text-[#5B4DFB]">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#5B4DFB]"></span> You
+                        <span className="flex items-center gap-1 text-[#315B50]">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#315B50]"></span> You
                         </span>
                         <span className="flex items-center gap-1 text-emerald-600">
                           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Reference
@@ -816,21 +815,21 @@ export default function App() {
             ) : (
               /* Simple Initial Empty State */
               <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center flex flex-col items-center justify-center min-h-[420px] shadow-xs">
-                <div className="w-14 h-14 rounded-2xl bg-[#F0EFFF] text-[#5B4DFB] flex items-center justify-center mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#EEF3EF] text-[#315B50] flex items-center justify-center mb-4">
                   <Mic className="h-7 w-7" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-1">
-                  Ready to listen!
+                  No recording analyzed yet
                 </h3>
                 <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
-                  Upload an audio file on the left or try our sample speech to see your delivery score, timeline flaws, and coach tips.
+                  Choose a recording or load the sample to view the results here.
                 </p>
                 <button
                   onClick={handleLoadDemo}
                   disabled={loading}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#5B4DFB] text-white hover:bg-[#4A3CE5] transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#315B50] text-white hover:bg-[#26483F] transition-colors cursor-pointer"
                 >
-                  Load Sample Speech
+                  Load sample recording
                 </button>
               </div>
             )}
@@ -845,10 +844,10 @@ export default function App() {
       <footer id="team" className="border-t border-slate-200 bg-white py-5 mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
           <div>
-            <span className="font-bold text-slate-800">SpeechFlaw</span> • Multimodal AI Hackathon 2026 (Track C)
+            <span className="font-bold text-slate-800">SpeechFlaw</span> • Speech delivery project
           </div>
           <div>
-            Built with ❤️ by <span className="font-semibold text-slate-700">Priyanshu Singh, Aarav Sharma, Rohan Verma, and Ananya Iyer</span>
+            Built with ❤️ by Team <b>Cheetah</b> — Priyanshu Kumar Singh, Prince Kumar, Pratham Gupta, Pradhan Mahatha
           </div>
         </div>
       </footer>
@@ -946,7 +945,7 @@ function SimpleChart({
           <path d={bPath} fill="none" stroke="#10B981" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
 
           {/* You Curve (Purple) */}
-          <path d={pPath} fill="none" stroke="#5B4DFB" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={pPath} fill="none" stroke="#315B50" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round" />
 
           {/* Playhead */}
           <line

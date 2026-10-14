@@ -1,7 +1,7 @@
 # SpeechFlaw: Contrastive Speech Analytics & Temporal Flaw Grounding
 ### Technical Report & System Architecture Specification
 **Multimodal AI Hackathon 2026 — Track C**  
-**Authors:** Priyanshu Singh, Aarav Sharma, Rohan Verma, Ananya Iyer  
+**Authors:** Priyanshu Kumar Singh, Prince Kumar, Pratham Gupta, Pradhan Mahatha (Team Cheetah)  
 **Repository:** [GitHub: Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding](https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-)
 
 ---
