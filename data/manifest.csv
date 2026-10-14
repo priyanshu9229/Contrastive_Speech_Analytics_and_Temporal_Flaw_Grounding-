@@ -1,0 +1,56 @@
+clip_id,speech_id,level,flaw_type,start_s,end_s,magnitude,baseline_path,flawed_path,transcript_path
+stay_hungry_L1,stay_hungry,L1,too_fast,1.5,4.274,1.55x,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L1.wav,data/raw/stay_hungry.txt
+stay_hungry_L1,stay_hungry,L1,long_pauses,5.474,8.834,2.4s silence,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L1.wav,data/raw/stay_hungry.txt
+stay_hungry_L1,stay_hungry,L1,monotone,11.334,15.834,pitch flattened,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L1.wav,data/raw/stay_hungry.txt
+stay_hungry_L1,stay_hungry,L1,volume_drop,18.334,21.834,-14dB,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L1.wav,data/raw/stay_hungry.txt
+stay_hungry_L1,stay_hungry,L1,pitch_spike,23.334,25.034,+5.0st,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L1.wav,data/raw/stay_hungry.txt
+stay_hungry_L2,stay_hungry,L2,too_slow,2.0,8.618,0.68x,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L2.wav,data/raw/stay_hungry.txt
+stay_hungry_L2,stay_hungry,L2,volume_drop,11.118,15.118,-12dB,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L2.wav,data/raw/stay_hungry.txt
+stay_hungry_L2,stay_hungry,L2,long_pauses,17.118,19.878,1.8s silence,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L2.wav,data/raw/stay_hungry.txt
+stay_hungry_L2,stay_hungry,L2,monotone,22.378,27.378,pitch flattened,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L2.wav,data/raw/stay_hungry.txt
+stay_hungry_L3,stay_hungry,L3,too_fast,3.0,6.214,1.40x,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L3.wav,data/raw/stay_hungry.txt
+stay_hungry_L3,stay_hungry,L3,missing_pauses,8.714,13.084,stripped pauses,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L3.wav,data/raw/stay_hungry.txt
+stay_hungry_L3,stay_hungry,L3,pitch_spike,16.584,18.384,+4.0st,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L3.wav,data/raw/stay_hungry.txt
+stay_hungry_L4,stay_hungry,L4,volume_drop,6.5,10.5,-10dB,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L4.wav,data/raw/stay_hungry.txt
+stay_hungry_L4,stay_hungry,L4,too_slow,16.0,21.769,0.78x,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L4.wav,data/raw/stay_hungry.txt
+stay_hungry_L5,stay_hungry,L5,pitch_spike,14.0,15.6,+3.5st,data/raw/stay_hungry.wav,data/dataset/stay_hungry_L5.wav,data/raw/stay_hungry.txt
+dream_L1,dream,L1,monotone,1.0,5.5,pitch flattened,data/raw/dream.wav,data/dataset/dream_L1.wav,data/raw/dream.txt
+dream_L1,dream,L1,too_fast,6.5,8.833,1.50x,data/raw/dream.wav,data/dataset/dream_L1.wav,data/raw/dream.txt
+dream_L1,dream,L1,long_pauses,9.833,12.993,2.2s silence,data/raw/dream.wav,data/dataset/dream_L1.wav,data/raw/dream.txt
+dream_L1,dream,L1,volume_drop,14.493,17.993,-13dB,data/raw/dream.wav,data/dataset/dream_L1.wav,data/raw/dream.txt
+dream_L1,dream,L1,pitch_spike,18.993,20.493,+4.8st,data/raw/dream.wav,data/dataset/dream_L1.wav,data/raw/dream.txt
+dream_L2,dream,L2,too_slow,1.5,7.214,0.70x,data/raw/dream.wav,data/dataset/dream_L2.wav,data/raw/dream.txt
+dream_L2,dream,L2,missing_pauses,8.714,11.444,stripped pauses,data/raw/dream.wav,data/dataset/dream_L2.wav,data/raw/dream.txt
+dream_L2,dream,L2,volume_drop,12.944,16.444,-12dB,data/raw/dream.wav,data/dataset/dream_L2.wav,data/raw/dream.txt
+dream_L2,dream,L2,pitch_spike,17.444,18.944,+4.2st,data/raw/dream.wav,data/dataset/dream_L2.wav,data/raw/dream.txt
+dream_L3,dream,L3,too_fast,2.5,5.616,1.38x,data/raw/dream.wav,data/dataset/dream_L3.wav,data/raw/dream.txt
+dream_L3,dream,L3,long_pauses,7.816,10.376,1.6s silence,data/raw/dream.wav,data/dataset/dream_L3.wav,data/raw/dream.txt
+dream_L3,dream,L3,monotone,13.376,17.876,pitch flattened,data/raw/dream.wav,data/dataset/dream_L3.wav,data/raw/dream.txt
+dream_L4,dream,L4,volume_drop,5.0,8.8,-9.5dB,data/raw/dream.wav,data/dataset/dream_L4.wav,data/raw/dream.txt
+dream_L4,dream,L4,pitch_spike,15.0,16.5,+3.8st,data/raw/dream.wav,data/dataset/dream_L4.wav,data/raw/dream.txt
+dream_L5,dream,L5,too_slow,8.0,12.268,0.82x,data/raw/dream.wav,data/dataset/dream_L5.wav,data/raw/dream.txt
+moon_L1,moon,L1,too_fast,1.0,3.303,1.52x,data/raw/moon.wav,data/dataset/moon_L1.wav,data/raw/moon.txt
+moon_L1,moon,L1,volume_drop,4.303,7.303,-13.5dB,data/raw/moon.wav,data/dataset/moon_L1.wav,data/raw/moon.txt
+moon_L1,moon,L1,long_pauses,7.803,10.563,2.0s silence,data/raw/moon.wav,data/dataset/moon_L1.wav,data/raw/moon.txt
+moon_L1,moon,L1,monotone,11.763,15.263,pitch flattened,data/raw/moon.wav,data/dataset/moon_L1.wav,data/raw/moon.txt
+moon_L2,moon,L2,too_slow,1.2,6.417,0.69x,data/raw/moon.wav,data/dataset/moon_L2.wav,data/raw/moon.txt
+moon_L2,moon,L2,pitch_spike,7.617,9.117,+4.5st,data/raw/moon.wav,data/dataset/moon_L2.wav,data/raw/moon.txt
+moon_L2,moon,L2,missing_pauses,10.617,14.197,stripped pauses,data/raw/moon.wav,data/dataset/moon_L2.wav,data/raw/moon.txt
+moon_L3,moon,L3,too_fast,2.0,4.536,1.38x,data/raw/moon.wav,data/dataset/moon_L3.wav,data/raw/moon.txt
+moon_L3,moon,L3,volume_drop,7.036,10.536,-11dB,data/raw/moon.wav,data/dataset/moon_L3.wav,data/raw/moon.txt
+moon_L4,moon,L4,monotone,4.0,7.5,pitch flattened,data/raw/moon.wav,data/dataset/moon_L4.wav,data/raw/moon.txt
+moon_L5,moon,L5,pitch_spike,8.5,9.8,+3.5st,data/raw/moon.wav,data/dataset/moon_L5.wav,data/raw/moon.txt
+beaches_L1,beaches,L1,too_fast,1.0,3.581,1.55x,data/raw/beaches.wav,data/dataset/beaches_L1.wav,data/raw/beaches.txt
+beaches_L1,beaches,L1,long_pauses,4.581,7.841,2.3s silence,data/raw/beaches.wav,data/dataset/beaches_L1.wav,data/raw/beaches.txt
+beaches_L1,beaches,L1,monotone,9.341,13.841,pitch flattened,data/raw/beaches.wav,data/dataset/beaches_L1.wav,data/raw/beaches.txt
+beaches_L1,beaches,L1,volume_drop,15.341,18.841,-14dB,data/raw/beaches.wav,data/dataset/beaches_L1.wav,data/raw/beaches.txt
+beaches_L1,beaches,L1,pitch_spike,19.841,21.341,+4.6st,data/raw/beaches.wav,data/dataset/beaches_L1.wav,data/raw/beaches.txt
+beaches_L2,beaches,L2,too_slow,1.5,7.824,0.68x,data/raw/beaches.wav,data/dataset/beaches_L2.wav,data/raw/beaches.txt
+beaches_L2,beaches,L2,missing_pauses,9.524,13.053,stripped pauses,data/raw/beaches.wav,data/dataset/beaches_L2.wav,data/raw/beaches.txt
+beaches_L2,beaches,L2,volume_drop,14.553,18.053,-12dB,data/raw/beaches.wav,data/dataset/beaches_L2.wav,data/raw/beaches.txt
+beaches_L3,beaches,L3,too_fast,2.0,5.022,1.39x,data/raw/beaches.wav,data/dataset/beaches_L3.wav,data/raw/beaches.txt
+beaches_L3,beaches,L3,long_pauses,7.322,9.982,1.7s silence,data/raw/beaches.wav,data/dataset/beaches_L3.wav,data/raw/beaches.txt
+beaches_L3,beaches,L3,pitch_spike,14.482,16.082,+4.0st,data/raw/beaches.wav,data/dataset/beaches_L3.wav,data/raw/beaches.txt
+beaches_L4,beaches,L4,volume_drop,6.0,9.8,-10dB,data/raw/beaches.wav,data/dataset/beaches_L4.wav,data/raw/beaches.txt
+beaches_L4,beaches,L4,too_slow,13.0,18.063,0.79x,data/raw/beaches.wav,data/dataset/beaches_L4.wav,data/raw/beaches.txt
+beaches_L5,beaches,L5,pitch_spike,11.0,12.5,+3.6st,data/raw/beaches.wav,data/dataset/beaches_L5.wav,data/raw/beaches.txt
