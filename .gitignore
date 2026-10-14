@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Node & Frontend
+web/node_modules/
+web/dist/
+.npm
+
+# Cache directory (intermediate numpy caches)
+cache/*.npz
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
