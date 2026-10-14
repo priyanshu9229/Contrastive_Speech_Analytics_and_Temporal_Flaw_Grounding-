@@ -22,6 +22,29 @@ import Plotly from 'plotly.js-dist-min'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
+// Resilient API fetch that automatically falls back across origins (localhost vs 127.0.0.1)
+async function apiFetch(endpoint, options = {}) {
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  const candidates = [
+    import.meta.env.VITE_API_URL,
+    isLocal ? `http://${window.location.hostname}:8000` : null,
+    'http://127.0.0.1:8000',
+    'http://localhost:8000'
+  ].filter(Boolean)
+
+  let lastError = null
+  for (const host of candidates) {
+    try {
+      const url = `${host}${endpoint}`
+      const res = await fetch(url, options)
+      return { res, host }
+    } catch (err) {
+      lastError = err
+    }
+  }
+  throw lastError || new Error('Failed to connect to backend analytics server at http://127.0.0.1:8000')
+}
+
 // Colorblind-safe category colors
 const FLAW_CATEGORY_COLORS = {
   pacing: '#E69F00',   // orange
@@ -194,8 +217,8 @@ export default function App() {
 
   // Fetch baseline speeches on mount (updates dynamically from backend)
   useEffect(() => {
-    fetch(`${API_BASE}/baselines`)
-      .then(res => {
+    apiFetch('/baselines')
+      .then(({ res }) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
@@ -223,16 +246,18 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/demo`)
+      const { res, host } = await apiFetch('/demo')
       if (!res.ok) throw new Error('Could not load sample benchmark.')
       const data = await res.json()
       setAnalysisData(data)
       setTranscript(data.words.map(w => w.word).join(' '))
-      const fullAudioUrl = `${API_BASE}${data.audio_url}?t=${Date.now()}`
+      const fullAudioUrl = `${host}${data.audio_url}?t=${Date.now()}`
       setAudioUrl(fullAudioUrl)
       setAudioFile({ name: 'demo_stay_hungry_l3.wav', size: 759862 })
     } catch (err) {
-      setError(err.message)
+      setError(err.message.includes('fetch') || err.message.includes('Failed to')
+        ? 'Cannot connect to backend server. Please verify the Python API is running on port 8000.'
+        : err.message)
     } finally {
       setLoading(false)
     }
@@ -254,22 +279,24 @@ export default function App() {
     formData.append('baseline_id', selectedBaseline)
 
     try {
-      const res = await fetch(`${API_BASE}/analyze`, {
+      const { res, host } = await apiFetch('/analyze', {
         method: 'POST',
         body: formData,
       })
       if (!res.ok) {
-        const errJson = await res.json()
+        const errJson = await res.json().catch(() => ({}))
         throw new Error(errJson.detail || 'Analysis could not be completed.')
       }
       const data = await res.json()
       setAnalysisData(data)
       if (data.audio_url) {
-        const fullAudioUrl = `${API_BASE}${data.audio_url}?t=${Date.now()}`
+        const fullAudioUrl = `${host}${data.audio_url}?t=${Date.now()}`
         setAudioUrl(fullAudioUrl)
       }
     } catch (err) {
-      setError(err.message)
+      setError(err.message.includes('fetch') || err.message.includes('Failed to')
+        ? 'Cannot connect to backend server at http://127.0.0.1:8000. Please verify the Python API is running.'
+        : err.message)
     } finally {
       setLoading(false)
     }
