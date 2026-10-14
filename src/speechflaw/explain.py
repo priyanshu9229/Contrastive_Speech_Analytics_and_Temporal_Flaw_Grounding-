@@ -1,111 +1,151 @@
 """
-speechflaw.explain: Deterministic Causal Explainability Engine
+speechflaw.explain: Causal Evidence & Actionable Coaching Engine
 Multimodal AI Hackathon 2026 - Track C
 
-Translates raw acoustic deltas and DTW residuals into structured, human-readable
-causal explanations linking mathematical deviation to oratorical performance,
-complete with aligned words and actionable delivery coaching recommendations.
+Formats exact numerical acoustic evidence:
+"{title}, {time_span}, '{words}': {part_val} vs {base_val} {unit} ({pct_change}%, z={z_score}); {detail}."
+Generates diverse, contextual oratorical tips without repetition across regions.
 """
 
-def format_timestamp(seconds: float) -> str:
-    """Formats seconds into MM:SS.ss timestamp string."""
-    mins = int(seconds // 60)
-    secs = seconds % 60
-    return f"{mins:02d}:{secs:04.1f}"
+import re
 
-TIPS_CATALOG = {
-    "too_fast": "Pacing surge detected. Practice breath-supported micro-pauses after key thematic nouns to allow your audience time to absorb critical premises.",
-    "too_slow": "Cadence drag detected. Increase forward velocity leading into rhetorical pivots to preserve dramatic tension and audience engagement.",
-    "missing_pauses": "Syntactic run-on detected. Insert deliberate 250-400ms pauses at punctuation marks and clause boundaries to cleanly segment structural thoughts.",
-    "long_pauses": "Dead air hesitation detected. Maintain diaphragm engagement during transitions to eliminate dead gaps and project commanding poise.",
-    "monotone": "Prosodic flattening detected. Modulate your pitch dynamic range (+3 to +6 semitones) on emotive verbs to avoid a hypnotic monotone drone.",
-    "volume_drop": "Projection decay detected. Support your breath through sentence conclusions rather than allowing vocal energy to trail off at phrase boundaries.",
-    "pitch_spike": "Vocal strain excursion detected. Anchor pitch modulation in your lower chest resonance to prevent pitch cracking under emotional emphasis.",
-    "stumble_filler": "Articulation turbulence detected. Slow down transition phonemes slightly to avoid consonant clashing and retain polished authority."
+def format_timestamp_short(seconds: float) -> str:
+    """Formats seconds into M:SS timestamp string."""
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins}:{secs:02d}"
+
+# Dynamic non-repeating tips per flaw type
+FLAW_TIPS_ROTATION = {
+    "too_fast": [
+        "Pacing surge detected. Insert a deliberate breath-supported pause before starting the next clause.",
+        "Practice elongating stressed vowels on thematic nouns to allow your core premise to settle.",
+        "Use micro-pauses at natural syntactic boundaries to prevent running through critical ideas.",
+        "Ground your tempo with steady diaphragmatic control to maintain rhetorical poise."
+    ],
+    "too_slow": [
+        "Cadence drag detected. Increase forward velocity into rhetorical pivots to sustain dramatic tension.",
+        "Keep transition syllables light and snappy rather than protracting unstressed words.",
+        "Accelerate through explanatory connective phrases to keep listener attention sharp.",
+        "Pick up your tempo heading into key points to convey decisive conviction."
+    ],
+    "missing_pauses": [
+        "Run-on delivery detected. Insert a crisp 300ms pause after major punctuation marks.",
+        "Allow sentences to land with full silence before launching into subsequent supporting points.",
+        "Segment structural thoughts by taking a silent breath at clause boundaries.",
+        "Avoid vocalizing connective words across sentences; let silence signal transition."
+    ],
+    "long_pauses": [
+        "Prolonged hesitation detected. Maintain diaphragm engagement across phrase transitions.",
+        "Keep conversational pauses between 0.5s and 1.0s to avoid losing audience momentum.",
+        "If framing a pause for emphasis, ensure your facial posture remains active and poised.",
+        "Eliminate dead air gaps by mentally cueing the opening word of the upcoming phrase."
+    ],
+    "monotone": [
+        "Prosodic flattening detected. Modulate pitch by +3 to +6 semitones on primary emotive verbs.",
+        "Vary intonation between narrative setup (neutral pitch) and climax (elevated pitch).",
+        "Avoid hypnotic pitch droning by inflecting downward at full stops and upward on questions.",
+        "Consciously broaden pitch contours to mirror the emotional gravity of the text."
+    ],
+    "volume_drop": [
+        "Projection decay detected. Support your breath steadily through the final syllable of the phrase.",
+        "Do not allow chest energy to fade at sentence boundaries; project through terminal words.",
+        "Anchor vocal resonance in your lower mask so volume remains stable across the entire clause.",
+        "Ensure critical concluding nouns receive equal dynamic intensity as the opening words."
+    ],
+    "pitch_spike": [
+        "Vocal strain excursion detected. Anchor emotional emphasis in lower chest resonance.",
+        "Prevent abrupt pitch cracking by relaxing the throat and engaging core diaphragm support.",
+        "Express oratorical intensity through vocal presence and deliberate articulation, not throat tension.",
+        "Smooth out pitch excursions by ascending gradually into stressed syllables."
+    ],
+    "stumble_filler": [
+        "Articulation turbulence detected. Decelerate slightly through complex consonant clusters.",
+        "Replace filler vocalizations with clean, deliberate silence while gathering your next thought.",
+        "Maintain clean jaw articulation to prevent syllable clipping on unfamiliar words.",
+        "Enunciate multi-syllable transition words clearly before picking up forward tempo."
+    ]
 }
 
-def generate_causal_explanation(flaw: dict) -> dict:
+def generate_causal_explanation(flaw: dict, index: int = 0) -> dict:
     """
-    Generates a structured causal explanation for a single detected flaw region.
-    Returns:
-        dict containing:
-        - title: human-readable flaw summary
-        - time_span: formatted timestamp range
-        - words: aligned transcript excerpt
-        - mathematical_rationale: explicit mathematical delta and z-score
-        - perceptual_impact: subjective listening experience
-        - actionable_tip: precise oratorical advice
+    Generates a structured causal explanation embedding real numbers from evidence.
+    Template:
+    "{title}, {time_span}, '{words}': {part_val} vs {base_val} {unit} ({pct_change}%, z={z_score}); {detail}."
     """
     f_type = flaw["flaw_type"]
     t_start = flaw["start"]
     t_end = flaw["end"]
-    time_span = f"{format_timestamp(t_start)} - {format_timestamp(t_end)}"
-    words = flaw.get("words", "").strip()
-    words_quoted = f"'{words}'" if words else "phrase segment"
-    ev = flaw.get("evidence", {})
+    time_span = f"{format_timestamp_short(t_start)}-{format_timestamp_short(t_end)}"
     
+    words_raw = flaw.get("words", "").strip()
+    words_tokens = words_raw.split()
+    if len(words_tokens) > 5:
+        words_snippet = " ".join(words_tokens[:4]) + "..."
+    else:
+        words_snippet = words_raw if words_raw else "spoken segment"
+        
+    ev = flaw.get("evidence", {})
     feature = ev.get("feature", "Acoustic Metric")
     p_val = ev.get("participant_val", 0.0)
     b_val = ev.get("baseline_val", 0.0)
+    unit = ev.get("unit", "")
+    pct = ev.get("pct_change", 0.0)
     z_score = ev.get("z_score", 0.0)
-    pct_change = ev.get("pct_change", 0.0)
+    detail = ev.get("detail", "deviation from baseline expectation")
     
-    sign = "+" if pct_change > 0 else ""
+    pct_sign = "+" if pct > 0 else ""
+    pct_str = f"{pct_sign}{pct:.0f}%" if abs(pct) >= 1.0 else f"{pct_sign}{pct:.1f}%"
     
-    if f_type == "too_fast":
-        title = "Pushed Cadence (Rushed Delivery)"
-        rationale = f"Speech rate accelerated to {p_val} syl/s vs baseline {b_val} syl/s ({sign}{pct_change}%, z={z_score})."
-        impact = "Delivery sounds rushed and breathless, risking listener comprehension loss."
-        
-    elif f_type == "too_slow":
-        title = "Dragged Cadence (Lethargic Pacing)"
-        rationale = f"Speech rate slowed to {p_val} syl/s vs baseline {b_val} syl/s ({sign}{pct_change}%, z={z_score})."
-        impact = "Tempo lags behind rhetorical expectations, causing vocal energy to drain."
-        
-    elif f_type == "missing_pauses":
-        title = "Missing Structural Pauses (Run-On Delivery)"
-        rationale = f"Syntactic pause ratio collapsed to {p_val}% vs baseline {b_val}% (z={z_score})."
-        impact = "Sentences bleed together without rhetorical breathing space, severing phrase syntax."
-        
-    elif f_type == "long_pauses":
-        title = "Unnatural Pause (Dead Air Freeze)"
-        rationale = f"Disproportionate silence interval of {p_val}s observed (baseline expected {b_val}s, z={z_score})."
-        impact = "Extended conversational freeze creates awkward hesitation and disrupts train of thought."
-        
-    elif f_type == "monotone":
-        title = "Prosodic Flattening (Monotone Drone)"
-        rationale = f"Semitone pitch variance compressed by {abs(pct_change):.1f}% (std {p_val}st vs baseline {b_val}st, z={z_score})."
-        impact = "Vocal delivery becomes robotic and devoid of emotive crests, dulling rhetorical persuasion."
-        
-    elif f_type == "volume_drop":
-        title = "Projection Drop (Volume Decay)"
-        rationale = f"Local acoustic energy dropped by {abs(pct_change):.1f} dB (RMS z={z_score})."
-        impact = "Voice trails off below clarity threshold, projecting diffidence or physical fatigue."
-        
-    elif f_type == "pitch_spike":
-        title = "Vocal Pitch Spike (Acoustic Strain)"
-        rationale = f"Unmotivated pitch excursion of {sign}{pct_change:.1f} semitones above local contour (z={z_score})."
-        impact = "Abrupt pitch crack creates perceived anxiety or uncontrolled vocal tension."
-        
-    elif f_type == "stumble_filler":
-        title = "Articulation Turbulence (Disfluency)"
-        rationale = f"Spectral flux anomaly of {p_val} vs baseline {b_val} indicates disfluent repetition."
-        impact = "Momentary stumble degrades oratorical polish and professional composure."
-        
-    else:
-        title = f"Delivery Anomaly ({f_type})"
-        rationale = f"Significant acoustic divergence observed ({feature}: {p_val} vs {b_val}, z={z_score})."
-        impact = "Delivery strays notably from the canonical oratorical template."
-        
-    tip = TIPS_CATALOG.get(f_type, "Maintain consistent breath support and deliberate rhetorical pacing.")
+    # Title mapping
+    title_map = {
+        "too_fast": "Pacing (fast)",
+        "too_slow": "Pacing (slow)",
+        "missing_pauses": "Pauses (missing)",
+        "long_pauses": "Pauses (unnatural long)",
+        "monotone": "Pitch (monotone)",
+        "volume_drop": "Energy (volume drop)",
+        "pitch_spike": "Pitch (spike)",
+        "stumble_filler": "Clarity (stumble/filler)"
+    }
+    title = title_map.get(f_type, f"Delivery ({f_type})")
     
-    full_text = f"{time_span} ({words_quoted}): {rationale} {impact}"
+    # Format exact mathematical rationale following user template
+    math_rationale = (
+        f"{title}, {time_span}, '{words_snippet}': "
+        f"{p_val:.1f} vs {b_val:.1f} {unit} ({pct_str}, z={z_score:.1f}); {detail}."
+    )
+    
+    # Perceptual impact description
+    impact_map = {
+        "too_fast": "Delivery sounds rushed and breathless, risking listener comprehension loss.",
+        "too_slow": "Tempo lags behind rhetorical expectations, causing dramatic tension to drain.",
+        "missing_pauses": "Thoughts bleed together without rhetorical breathing space, severing phrase syntax.",
+        "long_pauses": "Extended conversational freeze creates awkward hesitation and disrupts train of thought.",
+        "monotone": "Vocal delivery becomes robotic and devoid of emotive crests, dulling persuasion.",
+        "volume_drop": "Voice trails off below clarity threshold, projecting diffidence or physical fatigue.",
+        "pitch_spike": "Abrupt pitch crack creates perceived anxiety or uncontrolled vocal tension.",
+        "stumble_filler": "Momentary articulation stumble degrades oratorical polish and professional composure."
+    }
+    impact = impact_map.get(f_type, "Acoustic delivery deviates notably from canonical oratorical standard.")
+    
+    # Diverse non-repeating tip selection
+    tips_pool = FLAW_TIPS_ROTATION.get(f_type, ["Maintain consistent breath support and deliberate rhetorical pacing."])
+    tip = tips_pool[index % len(tips_pool)]
+    
+    # Secondary tag mention if overlap was resolved
+    secondary_tag = flaw.get("secondary_tag")
+    if secondary_tag and secondary_tag != f_type:
+        secondary_name = title_map.get(secondary_tag, secondary_tag)
+        impact += f" (accompanied by {secondary_name})"
+        
+    full_text = f"{math_rationale} {impact}"
     
     return {
         "title": title,
         "time_span": time_span,
-        "words": words,
-        "mathematical_rationale": rationale,
+        "words": words_raw,
+        "mathematical_rationale": math_rationale,
         "perceptual_impact": impact,
         "actionable_tip": tip,
         "full_explanation": full_text
@@ -114,8 +154,8 @@ def generate_causal_explanation(flaw: dict) -> dict:
 def explain_all_flaws(flaws: list[dict]) -> list[dict]:
     """Generates enriched explanations for all detected flaw regions."""
     explained = []
-    for flaw in flaws:
-        exp = generate_causal_explanation(flaw)
+    for idx, flaw in enumerate(flaws):
+        exp = generate_causal_explanation(flaw, index=idx)
         item = flaw.copy()
         item.update(exp)
         explained.append(item)

@@ -71,3 +71,46 @@ def test_analyze_endpoint_with_m4a_audio():
     assert data["scores"]["overall"] >= 80.0
     assert "time_series" in data
     assert data["audio_url"].endswith(".wav")
+
+def test_analyze_endpoint_wer_warning_banner_mismatch():
+    """Verifies that an audio with mismatched transcript generates the exact warning string."""
+    wav_path = "data/dataset/stay_hungry_L1.wav"
+    assert os.path.exists(wav_path)
+    
+    # Intentionally mismatched transcript (Churchill's beaches speech text against Jobs' stay_hungry audio)
+    mismatched_text = open("data/raw/beaches.txt", "r", encoding="utf-8").read()
+    
+    with open(wav_path, "rb") as f:
+        response = client.post(
+            "/analyze",
+            files={"participant_audio": ("stay_hungry.wav", f, "audio/wav")},
+            data={
+                "baseline_id": "stay_hungry",
+                "transcript": mismatched_text
+            }
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert "warning" in data
+    assert data["warning"] == "audio does not match the transcript/reference"
+    assert "wer" in data
+    assert data["wer"] > 0.5
+
+def test_analyze_endpoint_matching_transcript():
+    """Verifies that matching transcript has no warning banner."""
+    wav_path = "data/dataset/stay_hungry_L5.wav"
+    matching_text = open("data/raw/stay_hungry.txt", "r", encoding="utf-8").read()
+    
+    with open(wav_path, "rb") as f:
+        response = client.post(
+            "/analyze",
+            files={"participant_audio": ("stay_hungry.wav", f, "audio/wav")},
+            data={
+                "baseline_id": "stay_hungry",
+                "transcript": matching_text
+            }
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("warning") is None
+    assert data.get("wer", 0.0) <= 0.5

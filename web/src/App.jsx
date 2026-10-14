@@ -1,92 +1,120 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Play,
   Pause,
-  UploadCloud,
-  Clock,
-  Volume2,
-  ChevronRight,
-  Sparkles,
-  Info,
-  CheckCircle,
-  FileAudio,
-  ExternalLink,
-  Mic,
+  Upload,
   RotateCcw,
-  BarChart3,
-  ListFilter,
-  LineChart,
-  Github
+  Volume2,
+  Info,
+  ExternalLink,
+  FileAudio,
+  AlertCircle,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from 'lucide-react'
+import WaveSurfer from 'wavesurfer.js'
+import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js'
+import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
+import Plotly from 'plotly.js-dist-min'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
-// Friendly human labels and clean styling for flaws
-const FLAW_TYPES = {
-  too_fast: {
-    label: 'Speaking Too Fast',
-    badge: 'bg-red-50 text-red-700 border-red-200',
-    color: '#EF4444',
-    bg: '#FEF2F2',
-    simpleExplain: 'You rushed through this sentence faster than the standard pace.',
-    simpleTip: 'Take a calm breath and give key words extra space to land.'
-  },
-  too_slow: {
-    label: 'Speaking Too Slow',
-    badge: 'bg-orange-50 text-orange-700 border-orange-200',
-    color: '#F97316',
-    bg: '#FFF7ED',
-    simpleExplain: 'Your delivery dragged down here, making the sentence lose momentum.',
-    simpleTip: 'Pick up your cadence slightly to keep the listener engaged.'
-  },
-  missing_pauses: {
-    label: 'No Break Between Sentences',
-    badge: 'bg-pink-50 text-pink-700 border-pink-200',
-    color: '#EC4899',
-    bg: '#FDF2F8',
-    simpleExplain: 'Clauses ran together without natural punctuation pauses.',
-    simpleTip: 'Insert a 0.5-second pause at commas and full stops.'
-  },
-  long_pauses: {
-    label: 'Unusually Long Pause',
-    badge: 'bg-amber-50 text-amber-800 border-amber-200',
-    color: '#EAB308',
-    bg: '#FEFCE8',
-    simpleExplain: 'There was a prolonged hesitation or silence here.',
-    simpleTip: 'Keep pauses intentional (0.5s to 1.2s) so the flow stays intact.'
-  },
-  monotone: {
-    label: 'Monotone Pitch',
-    badge: 'bg-purple-50 text-purple-700 border-purple-200',
-    color: '#64748B',
-    bg: '#FAF5FF',
-    simpleExplain: 'Your voice stayed flat without pitch inflection or enthusiasm.',
-    simpleTip: 'Raise your pitch slightly on key nouns and emphasized verbs.'
-  },
-  volume_drop: {
-    label: 'Sudden Volume Drop',
-    badge: 'bg-sky-50 text-sky-700 border-sky-200',
-    color: '#0284C7',
-    bg: '#F0F9FF',
-    simpleExplain: 'Your voice dropped in volume toward the end of the phrase.',
-    simpleTip: 'Maintain steady breath support all the way through the end of the sentence.'
-  },
-  pitch_spike: {
-    label: 'Sharp Pitch Spike',
-    badge: 'bg-rose-50 text-rose-700 border-rose-200',
-    color: '#DC2626',
-    bg: '#FFF1F2',
-    simpleExplain: 'There was an abrupt jump in vocal pitch, sounding strained.',
-    simpleTip: 'Keep your vocal chords relaxed to avoid sudden strained jumps.'
-  },
-  stumble_filler: {
-    label: 'Hesitation or Stumble',
-    badge: 'bg-teal-50 text-teal-700 border-teal-200',
-    color: '#0D9488',
-    bg: '#F0FDFA',
-    simpleExplain: 'Slight stumble, filler sound, or repeated syllable detected.',
-    simpleTip: 'It is okay to pause silently instead of using filler sounds.'
-  },
+// Colorblind-safe category colors
+const FLAW_CATEGORY_COLORS = {
+  pacing: '#E69F00',   // orange
+  pauses: '#56B4E9',   // sky blue
+  pitch: '#CC79A7',    // reddish purple
+  energy: '#F0E442',   // yellow
+  clarity: '#D55E00',  // vermilion
+}
+
+function getFlawCategory(flawType) {
+  switch (flawType) {
+    case 'too_fast':
+    case 'too_slow':
+      return 'pacing'
+    case 'missing_pauses':
+    case 'long_pauses':
+      return 'pauses'
+    case 'monotone':
+    case 'pitch_spike':
+      return 'pitch'
+    case 'volume_drop':
+      return 'energy'
+    case 'stumble_filler':
+      return 'clarity'
+    default:
+      return 'pacing'
+  }
+}
+
+function getFlawColor(flawType) {
+  const cat = getFlawCategory(flawType)
+  return FLAW_CATEGORY_COLORS[cat] || '#E69F00'
+}
+
+function getFlawRgba(flawType, alpha = 0.25) {
+  const hex = getFlawColor(flawType)
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function getFlawLabel(flawType) {
+  switch (flawType) {
+    case 'too_fast': return 'Pacing (Fast)'
+    case 'too_slow': return 'Pacing (Slow)'
+    case 'missing_pauses': return 'Missing Pause'
+    case 'long_pauses': return 'Unnatural Pause'
+    case 'monotone': return 'Monotone Pitch'
+    case 'pitch_spike': return 'Pitch Excursion'
+    case 'volume_drop': return 'Volume Drop'
+    case 'stumble_filler': return 'Articulation / Filler'
+    default: return flawType.replace('_', ' ')
+  }
+}
+
+function getGrade(score) {
+  if (score >= 90) return 'A'
+  if (score >= 75) return 'B'
+  if (score >= 60) return 'C'
+  if (score >= 40) return 'D'
+  return 'F'
+}
+
+function getGradeLabel(grade) {
+  switch (grade) {
+    case 'A': return 'Exemplary'
+    case 'B': return 'Competent'
+    case 'C': return 'Acceptable'
+    case 'D': return 'Noticeably Flawed'
+    default: return 'Deficient'
+  }
+}
+
+function getScoreColor(score) {
+  if (score > 70) return '#2FBF9B'
+  if (score >= 40) return '#E69F00'
+  return '#EF4444'
+}
+
+function formatTime(secs) {
+  if (!secs || isNaN(secs) || secs < 0) return '00:00.0'
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  const ms = Math.floor((secs % 1) * 10)
+  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}.${ms}`
+}
+
+function formatRange(start, end) {
+  const m1 = Math.floor(start / 60)
+  const s1 = Math.floor(start % 60)
+  const m2 = Math.floor(end / 60)
+  const s2 = Math.floor(end % 60)
+  return `${m1}:${s1 < 10 ? '0' : ''}${s1}-${m2}:${s2 < 10 ? '0' : ''}${s2}`
 }
 
 export default function App() {
@@ -98,17 +126,26 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [analysisData, setAnalysisData] = useState(null)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('scores') // 'scores' | 'flaws' | 'charts'
-  const [playbackRate, setPlaybackRate] = useState(1.0)
   
-  // Audio playback state
-  const audioRef = useRef(null)
+  // Transport & playback state
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [activeFlawHover, setActiveFlawHover] = useState(null)
+  const [playbackRate, setPlaybackRate] = useState(1.0)
+  const [hoveredFlawIndex, setHoveredFlawIndex] = useState(null)
+  const [activeFlawIndex, setActiveFlawIndex] = useState(null)
+  const [showHelp, setShowHelp] = useState(false)
 
-  // Fetch baseline options on mount
+  // DOM Refs
+  const waveContainerRef = useRef(null)
+  const timelineContainerRef = useRef(null)
+  const wavesurferRef = useRef(null)
+  const regionsPluginRef = useRef(null)
+  const pitchChartRef = useRef(null)
+  const energyChartRef = useRef(null)
+  const rateChartRef = useRef(null)
+
+  // Fetch baseline speeches on mount
   useEffect(() => {
     fetch(`${API_BASE}/baselines`)
       .then(res => res.json())
@@ -119,12 +156,9 @@ export default function App() {
           setTranscript(data[0].transcript || '')
         }
       })
-      .catch(err => {
-        console.error('Failed to load baselines:', err)
-      })
+      .catch(err => console.error('Failed to load baselines:', err))
   }, [])
 
-  // Auto-fill transcript when changing baseline
   const handleBaselineChange = (e) => {
     const bId = e.target.value
     setSelectedBaseline(bId)
@@ -140,15 +174,13 @@ export default function App() {
     setError(null)
     try {
       const res = await fetch(`${API_BASE}/demo`)
-      if (!res.ok) throw new Error('Could not load sample recording.')
+      if (!res.ok) throw new Error('Could not load sample benchmark.')
       const data = await res.json()
       setAnalysisData(data)
       setTranscript(data.words.map(w => w.word).join(' '))
-      const fullAudioUrl = `${API_BASE}${data.audio_url}`
+      const fullAudioUrl = `${API_BASE}${data.audio_url}?t=${Date.now()}`
       setAudioUrl(fullAudioUrl)
-      if (audioRef.current) {
-        audioRef.current.src = fullAudioUrl
-      }
+      setAudioFile({ name: 'demo_stay_hungry_l3.wav', size: 759862 })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -185,9 +217,6 @@ export default function App() {
       if (data.audio_url) {
         const fullAudioUrl = `${API_BASE}${data.audio_url}?t=${Date.now()}`
         setAudioUrl(fullAudioUrl)
-        if (audioRef.current) {
-          audioRef.current.src = fullAudioUrl
-        }
       }
     } catch (err) {
       setError(err.message)
@@ -202,762 +231,871 @@ export default function App() {
       setAudioFile(file)
       const url = URL.createObjectURL(file)
       setAudioUrl(url)
-      if (audioRef.current) {
-        audioRef.current.src = url
-      }
     }
   }
 
-  const togglePlay = () => {
-    if (!audioRef.current) return
-    if (isPlaying) {
-      audioRef.current.pause()
-    } else {
-      audioRef.current.play()
-    }
-    setIsPlaying(!isPlaying)
-  }
+  const togglePlay = useCallback(() => {
+    if (!wavesurferRef.current) return
+    wavesurferRef.current.playPause()
+  }, [])
 
-  const seekToTime = (time) => {
-    if (!audioRef.current) return
-    audioRef.current.currentTime = time
+  const seekToTime = useCallback((time) => {
+    if (!wavesurferRef.current) return
+    const d = wavesurferRef.current.getDuration() || duration || 1.0
+    const ratio = Math.max(0, Math.min(1, time / d))
+    wavesurferRef.current.seekTo(ratio)
     setCurrentTime(time)
     if (!isPlaying) {
-      audioRef.current.play()
-      setIsPlaying(true)
+      wavesurferRef.current.play()
     }
-  }
+  }, [duration, isPlaying])
 
   const changePlaybackRate = (rate) => {
     setPlaybackRate(rate)
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate
+    if (wavesurferRef.current) {
+      wavesurferRef.current.setPlaybackRate(rate)
     }
   }
 
-  const formatTime = (secs) => {
-    if (!secs || isNaN(secs)) return '0:00'
-    const m = Math.floor(secs / 60)
-    const s = Math.floor(secs % 60)
-    return `${m}:${s < 10 ? '0' : ''}${s}`
-  }
+  const jumpFlaw = useCallback((direction) => {
+    if (!analysisData || !analysisData.flaw_regions || analysisData.flaw_regions.length === 0) return
+    const flaws = analysisData.flaw_regions
+    let nextIdx = 0
+    if (activeFlawIndex === null) {
+      nextIdx = direction > 0 ? 0 : flaws.length - 1
+    } else {
+      nextIdx = (activeFlawIndex + direction + flaws.length) % flaws.length
+    }
+    setActiveFlawIndex(nextIdx)
+    seekToTime(flaws[nextIdx].start)
+  }, [analysisData, activeFlawIndex, seekToTime])
 
-  const maxTime = analysisData?.summary?.duration || duration || 20.0
+  // Initialize and update WaveSurfer
+  useEffect(() => {
+    if (!audioUrl || !waveContainerRef.current) return
+
+    // Clean up previous instance
+    if (wavesurferRef.current) {
+      try {
+        wavesurferRef.current.destroy()
+      } catch (err) {
+        console.warn('WaveSurfer destroy warning:', err)
+      }
+    }
+
+    const wsRegions = RegionsPlugin.create()
+    regionsPluginRef.current = wsRegions
+
+    const timeline = TimelinePlugin.create({
+      container: timelineContainerRef.current || undefined,
+      primaryColor: '#8B96A3',
+      secondaryColor: '#2A333E',
+      primaryFontColor: '#9AA5B1',
+      secondaryFontColor: '#64748B',
+      fontSize: 9,
+      fontFamily: 'IBM Plex Mono, monospace',
+      timeInterval: 1,
+      primaryLabelInterval: 5,
+    })
+
+    const ws = WaveSurfer.create({
+      container: waveContainerRef.current,
+      waveColor: '#2A333E',
+      progressColor: '#2FBF9B',
+      cursorColor: '#E6EAF0',
+      cursorWidth: 1.5,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2,
+      height: 105,
+      normalize: true,
+      url: audioUrl,
+      plugins: [timeline, wsRegions],
+    })
+
+    wavesurferRef.current = ws
+
+    ws.on('timeupdate', (t) => setCurrentTime(t))
+    ws.on('seeking', (t) => setCurrentTime(t))
+    ws.on('ready', (d) => setDuration(d))
+    ws.on('play', () => setIsPlaying(true))
+    ws.on('pause', () => setIsPlaying(false))
+    ws.on('finish', () => setIsPlaying(false))
+
+    // Add flaw regions overlay
+    if (analysisData && analysisData.flaw_regions) {
+      ws.on('ready', () => {
+        analysisData.flaw_regions.forEach((flaw, idx) => {
+          wsRegions.addRegion({
+            id: `flaw-${idx}`,
+            start: flaw.start,
+            end: flaw.end,
+            color: getFlawRgba(flaw.flaw_type, 0.25),
+            drag: false,
+            resize: false,
+          })
+        })
+      })
+    }
+
+    wsRegions.on('region-clicked', (region, e) => {
+      e.stopPropagation()
+      region.play()
+    })
+
+    return () => {
+      try {
+        ws.destroy()
+      } catch (e) {
+        // cleanup safe
+      }
+    }
+  }, [audioUrl, analysisData])
+
+  // Update WaveSurfer region styles when hovering a flaw from the list
+  useEffect(() => {
+    if (!regionsPluginRef.current) return
+    const regions = regionsPluginRef.current.getRegions()
+    regions.forEach((r, idx) => {
+      const isHovered = hoveredFlawIndex === idx
+      const flaw = analysisData?.flaw_regions?.[idx]
+      if (flaw) {
+        r.setOptions({
+          color: isHovered
+            ? getFlawRgba(flaw.flaw_type, 0.45)
+            : getFlawRgba(flaw.flaw_type, 0.25),
+        })
+      }
+    })
+  }, [hoveredFlawIndex, analysisData])
+
+  // Global Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      if (e.code === 'Space') {
+        e.preventDefault()
+        togglePlay()
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault()
+        const target = Math.max(0, currentTime - 5)
+        seekToTime(target)
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault()
+        const target = Math.min(duration || 100, currentTime + 5)
+        seekToTime(target)
+      } else if (e.key === '[') {
+        e.preventDefault()
+        jumpFlaw(-1)
+      } else if (e.key === ']') {
+        e.preventDefault()
+        jumpFlaw(1)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [togglePlay, seekToTime, jumpFlaw, currentTime, duration])
+
+  const maxTime = duration || analysisData?.summary?.duration || 20.0
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
+    <div className="w-screen h-screen flex flex-col bg-[#0E1116] overflow-hidden select-none">
       
-      {/* Simple, Human Top Navbar */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          
-          {/* Logo & Project Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-[#315B50] flex items-center justify-center text-white shadow-sm">
-              <Mic className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-base font-bold text-slate-900 tracking-tight">
-                SpeechFlaw
-              </span>
-              <span className="text-xs text-slate-500 block -mt-0.5">
-                Speech analysis tool
-              </span>
-            </div>
+      {/* 48px Top Bar */}
+      <header className="h-12 border-b border-[#2A333E] bg-[#151A21] px-4 flex items-center justify-between shrink-0 z-30">
+        
+        {/* Left: Brand Identity */}
+        <div className="flex items-center space-x-2.5">
+          <div className="w-6 h-6 rounded bg-[#2FBF9B] flex items-center justify-center text-[#0E1116] font-bold">
+            <Activity className="h-3.5 w-3.5 stroke-[2.5]" />
           </div>
+          <span className="text-sm font-semibold tracking-tight text-[#E6EAF0]">
+            SpeechFlow
+          </span>
+          <span className="text-[10px] font-mono text-[#9AA5B1] border-l border-[#2A333E] pl-2 hidden sm:inline">
+            Acoustic Analysis & Flaw Grounding
+          </span>
+        </div>
 
-          {/* Simple Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-600">
-            <span className="text-[#315B50]">Analyzer</span>
-            <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How it works</a>
-            <a
-              href="https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-slate-900 flex items-center gap-1 transition-colors"
-            >
-              <Github className="h-3.5 w-3.5" />
-              GitHub
-            </a>
-          </nav>
+        {/* Right: Load Sample & Info Popover */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleLoadDemo}
+            disabled={loading}
+            className="px-2.5 py-1 text-xs font-mono font-medium rounded bg-[#1C232C] hover:bg-[#2A333E] text-[#E6EAF0] border border-[#2A333E] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {loading ? 'Analyzing...' : 'Load sample'}
+          </button>
 
-          {/* Action button */}
-          <div className="flex items-center space-x-2.5">
+          {/* Help Popover Trigger */}
+          <div className="relative">
             <button
-              onClick={handleLoadDemo}
-              disabled={loading}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#EEF3EF] text-[#315B50] hover:bg-[#DDE8E0] transition-colors cursor-pointer disabled:opacity-50"
+              onClick={() => setShowHelp(!showHelp)}
+              title="Pipeline Info & GitHub"
+              className="p-1 rounded text-[#9AA5B1] hover:text-[#E6EAF0] hover:bg-[#1C232C] transition-colors cursor-pointer"
             >
-              Load sample
+              <Info className="h-4 w-4" />
             </button>
+
+            {showHelp && (
+              <div className="absolute right-0 mt-2 w-72 bg-[#151A21] border border-[#2A333E] rounded p-3 text-xs shadow-xl z-50">
+                <div className="flex items-center justify-between border-b border-[#2A333E] pb-1.5 mb-2">
+                  <span className="font-semibold text-[#E6EAF0]">Pipeline Details</span>
+                  <button onClick={() => setShowHelp(false)} className="text-[#9AA5B1] hover:text-[#E6EAF0]">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="text-[#9AA5B1] leading-relaxed mb-2.5">
+                  SpeechFlow extracts continuous acoustic features (log-F0 semitones, RMS dB, local rate) with 10ms frame hops and performs dynamic time warping (DTW) registration against reference baselines.
+                </p>
+                <div className="space-y-1.5 font-mono text-[11px] border-t border-[#2A333E] pt-2">
+                  <a
+                    href="https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#2FBF9B] hover:underline flex items-center justify-between"
+                  >
+                    <span>GitHub Repository</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <a
+                    href="http://127.0.0.1:8000/docs"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#9AA5B1] hover:text-[#E6EAF0] flex items-center justify-between"
+                  >
+                    <span>FastAPI Swagger Docs</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <div className="text-[10px] text-[#9AA5B1] pt-1">
+                    Team: Priyanshu, Aarav, Rohan, Ananya
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Simple, Human Hero Section */}
-      <section className="pt-8 pb-5 px-4 text-center max-w-3xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-          Speech analysis
-        </h1>
-        <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl mx-auto">
-          Compare your recording with a reference and review pacing, pauses, pitch and volume.
-        </p>
-
-        {/* Clean, simple benefit tags */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs text-slate-600 font-medium">
-          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            Supports M4A, MP3 and WAV
-          </span>
-          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            Pacing and rhythm
-          </span>
-          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
-            Playback with feedback
-          </span>
-        </div>
-      </section>
-
-      {/* Main 2-Column Application Area */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 pb-14 flex-1 w-full">
+      {/* Main 3-Column Grid Shell (100dvh - 48px) */}
+      <div className="app-grid">
         
-        {/* Error Alert */}
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl mb-5 flex items-center justify-between text-sm">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700 font-bold ml-3">✕</button>
-          </div>
-        )}
-
-        {/* Hidden Audio Player */}
-        <audio
-          ref={audioRef}
-          onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
-          onLoadedMetadata={(e) => setDuration(e.target.duration)}
-          onEnded={() => setIsPlaying(false)}
-        />
-
-        {/* The 2-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ========================================================= */}
+        {/* LEFT PANEL: Input (320px)                                */}
+        {/* ========================================================= */}
+        <aside className="panel-left flex flex-col h-full bg-[#151A21] border-r border-[#2A333E] p-3 gap-3 overflow-y-auto">
           
-          {/* ======================================================= */}
-          {/* LEFT: Simple Upload Card                                */}
-          {/* ======================================================= */}
-          <div className="lg:col-span-5 flex flex-col gap-5">
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col gap-4">
-              
-              <h2 className="font-bold text-slate-900 text-base">
-                Upload recording
-              </h2>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
+            Audio Input
+          </div>
 
-              {/* Clean Upload Drop Area */}
-              <label className="border-2 border-dashed border-slate-300 hover:border-[#315B50] bg-slate-50 hover:bg-[#EEF3EF]/30 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group">
-                <input
-                  type="file"
-                  accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg,.flac"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 group-hover:border-[#315B50] text-[#315B50] flex items-center justify-center mb-2.5 shadow-2xs">
-                  <UploadCloud className="w-6 h-6" />
+          {/* Compact Dropzone (~112px tall) */}
+          <label className="h-28 border border-dashed border-[#2A333E] hover:border-[#2FBF9B] transition-colors rounded bg-[#0E1116] flex flex-col items-center justify-center p-2.5 text-center cursor-pointer group shrink-0">
+            <input
+              type="file"
+              accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg,.flac"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Upload className="h-5 w-5 text-[#9AA5B1] group-hover:text-[#2FBF9B] transition-colors mb-1.5" />
+            <div className="text-xs text-[#E6EAF0] font-medium">
+              Drop audio or browse
+            </div>
+            <div className="text-[10px] text-[#9AA5B1] font-mono mt-0.5">
+              WAV, MP3, M4A, AAC (Universal)
+            </div>
+          </label>
+
+          {/* Selected File Notice */}
+          {audioFile && (
+            <div className="bg-[#1C232C] border border-[#2A333E] rounded p-2 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <FileAudio className="h-4 w-4 text-[#2FBF9B] shrink-0" />
+                <div className="truncate">
+                  <p className="text-xs text-[#E6EAF0] font-mono truncate">{audioFile.name}</p>
+                  <p className="text-[10px] text-[#9AA5B1] font-mono tabular">
+                    {(audioFile.size / (1024 * 1024)).toFixed(2)} MB • {formatTime(maxTime)}
+                  </p>
                 </div>
-                <p className="text-sm font-semibold text-slate-800">
-                  Click to browse, or drag audio here
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Works with iPhone Voice Memos (.m4a), MP3, WAV
-                </p>
-              </label>
+              </div>
+            </div>
+          )}
 
-              {/* Selected File Card */}
-              {audioFile && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5 overflow-hidden">
-                    <FileAudio className="w-5 h-5 text-[#315B50] shrink-0" />
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-slate-800 truncate">{audioFile.name}</p>
-                      <p className="text-[11px] text-slate-500">{(audioFile.size / (1024 * 1024)).toFixed(1)} MB • Ready to analyze</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                    Selected
+          {/* Reference Baseline Select */}
+          <div className="space-y-1 shrink-0">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1] block">
+              Reference Baseline
+            </label>
+            <select
+              value={selectedBaseline}
+              onChange={handleBaselineChange}
+              className="w-full bg-[#0E1116] border border-[#2A333E] rounded px-2.5 py-1.5 text-xs text-[#E6EAF0] focus:outline-none focus:border-[#2FBF9B] cursor-pointer"
+            >
+              {baselines.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.speaker} — {b.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Transcript Textarea (Flexes to fill remaining height) */}
+          <div className="flex-1 flex flex-col min-h-[140px] space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
+              <span>Transcript</span>
+              <span className="tabular">{transcript.length} chars</span>
+            </div>
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              spellCheck={false}
+              placeholder="Spoken text for forced alignment and word-level grounding..."
+              className="w-full flex-1 bg-[#0E1116] border border-[#2A333E] rounded p-2 text-xs text-[#E6EAF0] font-mono resize-none focus:outline-none focus:border-[#2FBF9B] leading-relaxed"
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] p-2 rounded text-[11px] font-mono shrink-0">
+              {error}
+            </div>
+          )}
+
+          {/* Pinned Analyze Button */}
+          <button
+            onClick={handleAnalyze}
+            disabled={loading}
+            className="w-full py-2.5 px-3 bg-[#2FBF9B] hover:bg-[#28A787] text-[#0E1116] font-semibold text-xs rounded transition-colors flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            {loading ? (
+              <>
+                <span className="h-3.5 w-3.5 border-2 border-[#0E1116] border-t-transparent rounded-full animate-spin"></span>
+                <span>Analyzing...</span>
+              </>
+            ) : (
+              <span>Analyze</span>
+            )}
+          </button>
+
+        </aside>
+
+        {/* ========================================================= */}
+        {/* CENTER PANEL: Fluid Waveform & Stacked Plotly Charts     */}
+        {/* ========================================================= */}
+        <main className="panel-center flex flex-col h-full bg-[#0E1116] overflow-y-auto">
+          
+          {analysisData ? (
+            <>
+              {/* Transport Bar */}
+              <div className="h-10 border-b border-[#2A333E] bg-[#151A21] px-4 flex items-center justify-between shrink-0">
+                
+                {/* Play/Pause & Time */}
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={togglePlay}
+                    className="p-1 rounded bg-[#1C232C] hover:bg-[#2A333E] text-[#E6EAF0] border border-[#2A333E] transition-colors cursor-pointer"
+                  >
+                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </button>
+
+                  <button
+                    onClick={() => seekToTime(Math.max(0, currentTime - 5))}
+                    title="Seek -5s (Left Arrow)"
+                    className="p-1 rounded text-[#9AA5B1] hover:text-[#E6EAF0] hover:bg-[#1C232C] transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => seekToTime(Math.min(maxTime, currentTime + 5))}
+                    title="Seek +5s (Right Arrow)"
+                    className="p-1 rounded text-[#9AA5B1] hover:text-[#E6EAF0] hover:bg-[#1C232C] transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+
+                  <span className="tabular text-xs font-mono text-[#E6EAF0]">
+                    {formatTime(currentTime)} <span className="text-[#9AA5B1]">/ {formatTime(maxTime)}</span>
                   </span>
+                </div>
+
+                {/* Speed Controls & Keyboard Hint */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] text-[#9AA5B1] font-mono hidden xl:inline">
+                    Space: play/pause • [ ]: flaw jump
+                  </span>
+                  <div className="flex items-center border border-[#2A333E] rounded overflow-hidden">
+                    {[0.8, 1.0, 1.2].map(rate => (
+                      <button
+                        key={rate}
+                        onClick={() => changePlaybackRate(rate)}
+                        className={`px-2 py-0.5 text-[11px] font-mono transition-colors cursor-pointer ${
+                          playbackRate === rate
+                            ? 'bg-[#2FBF9B] text-[#0E1116] font-bold'
+                            : 'bg-[#151A21] text-[#9AA5B1] hover:text-[#E6EAF0]'
+                        }`}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Waveform Container (~150px tall, margins aligned with Plotly: px-2 container, pl-[50px] pr-[20px]) */}
+              <div className="border-b border-[#2A333E] bg-[#0E1116] pt-2 pb-1 shrink-0 px-2">
+                <div className="px-2 text-[11px] font-mono text-[#9AA5B1] uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Waveform & Temporal Flaw Intervals</span>
+                  <span className="text-[10px] text-[#9AA5B1]">Normalized Amplitude</span>
+                </div>
+                
+                {/* Waveform Wrapper: Pl-[50px] Pr-[20px] inside px-2 matches Plotly chart margin exactly */}
+                <div className="relative w-full pl-[50px] pr-[20px]">
+                  <div ref={waveContainerRef} className="w-full h-[105px]" />
+                  <div ref={timelineContainerRef} className="w-full h-[22px]" />
+                </div>
+              </div>
+
+              {/* Yellow Warning Banner above charts when mismatch warning is returned */}
+              {analysisData?.warning && (
+                <div data-testid="warning-banner" className="mx-2 mt-2 bg-[#F0E442]/15 border border-[#F0E442]/40 rounded px-3 py-2 flex items-center space-x-2 text-[#F0E442] text-xs font-mono shrink-0">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-[#F0E442]" />
+                  <span className="font-semibold uppercase tracking-wider">Warning:</span>
+                  <span>{analysisData.warning}</span>
+                  {analysisData.wer !== undefined && (
+                    <span className="text-[#9AA5B1] ml-auto">WER: {(analysisData.wer * 100).toFixed(1)}%</span>
+                  )}
                 </div>
               )}
 
-              {/* Step 2: Compare against reference */}
-              <div className="space-y-1 pt-1">
-                <label className="text-xs font-bold text-slate-800">
-                  Reference recording
-                </label>
-                <select
-                  value={selectedBaseline}
-                  onChange={handleBaselineChange}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-[#315B50] cursor-pointer"
-                >
-                  {baselines.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.speaker} — {b.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Stacked Plotly Charts Container */}
+              <div className="flex-1 flex flex-col px-2 pb-2 space-y-1">
+                
+                {/* Legend bar */}
+                <div className="px-3 flex items-center justify-between text-[11px] font-mono text-[#9AA5B1] pb-1">
+                  <span>Acoustic Trajectories (Synchronized Shared X-Axis)</span>
+                  <div className="flex items-center space-x-4">
+                    <span className="flex items-center gap-1.5 text-[#2FBF9B]">
+                      <span className="w-3 h-0.5 bg-[#2FBF9B]"></span> Participant
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#8B96A3]">
+                      <span className="w-3 h-0.5 border-t border-dashed border-[#8B96A3]"></span> Baseline Reference
+                    </span>
+                  </div>
+                </div>
 
-              {/* Step 3: Transcript (Simple / Collapsible) */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800">
-                  Transcript (optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="Transcript for word-by-word alignment..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-[#315B50] resize-none"
+                {/* Chart 1: Pitch in Semitones */}
+                <PlotlyTrackChart
+                  chartRef={pitchChartRef}
+                  title="Pitch (semitones)"
+                  unit="semitones"
+                  maxTime={maxTime}
+                  currentTime={currentTime}
+                  pTimes={analysisData.time_series.participant.times}
+                  pSeries={analysisData.time_series.participant.pitch}
+                  bTimes={analysisData.time_series.baseline.times}
+                  bSeries={analysisData.time_series.baseline.pitch}
+                  flaws={analysisData.flaw_regions}
+                  hoveredFlawIndex={hoveredFlawIndex}
+                  yMin={-8}
+                  yMax={8}
+                  onSeek={seekToTime}
                 />
+
+                {/* Chart 2: Energy in dB */}
+                <PlotlyTrackChart
+                  chartRef={energyChartRef}
+                  title="Energy (dB)"
+                  unit="dB z-score"
+                  maxTime={maxTime}
+                  currentTime={currentTime}
+                  pTimes={analysisData.time_series.participant.times}
+                  pSeries={analysisData.time_series.participant.energy}
+                  bTimes={analysisData.time_series.baseline.times}
+                  bSeries={analysisData.time_series.baseline.energy}
+                  flaws={analysisData.flaw_regions}
+                  hoveredFlawIndex={hoveredFlawIndex}
+                  yMin={-3.0}
+                  yMax={2.5}
+                  onSeek={seekToTime}
+                />
+
+                {/* Chart 3: Speech Rate in syl/s */}
+                <PlotlyTrackChart
+                  chartRef={rateChartRef}
+                  title="Speech rate (syl/s)"
+                  unit="syl/s"
+                  maxTime={maxTime}
+                  currentTime={currentTime}
+                  pTimes={analysisData.time_series.participant.times}
+                  pSeries={analysisData.time_series.participant.rate}
+                  bTimes={analysisData.time_series.baseline.times}
+                  bSeries={analysisData.time_series.baseline.rate}
+                  flaws={analysisData.flaw_regions}
+                  hoveredFlawIndex={hoveredFlawIndex}
+                  yMin={0.0}
+                  yMax={7.5}
+                  onSeek={seekToTime}
+                />
+
               </div>
-
-              {/* Main Action Button */}
-              <button
-                onClick={handleAnalyze}
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#315B50] hover:bg-[#26483F] text-white transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Analyzing your recording...</span>
-                  </>
-                ) : (
-                  <span>Analyze recording</span>
-                )}
-              </button>
-
-              {/* Demo Sample Link */}
-              <div className="pt-2 border-t border-slate-100 text-center">
-                <button
-                  onClick={handleLoadDemo}
-                  disabled={loading}
-                  className="text-xs font-semibold text-[#315B50] hover:underline cursor-pointer"
-                >
-                  Or load a sample recording
-                </button>
+            </>
+          ) : (
+            /* Empty State: Dashed outline placeholder with one line of text */
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="w-full max-w-xl h-48 border border-dashed border-[#2A333E] rounded flex items-center justify-center text-[#9AA5B1] font-mono text-xs">
+                Upload a recording or load a sample
               </div>
-
             </div>
+          )}
 
-            {/* Simple "How it Works" Card */}
-            <div id="how-it-works" className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs text-xs">
-              <h3 className="font-bold text-slate-900 mb-2">How it works</h3>
-              <ul className="space-y-1.5 text-slate-600">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-[#315B50] font-bold">1.</span>
-                  <span>Aligns your recording with the standard speech using non-linear audio warping.</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-[#315B50] font-bold">2.</span>
-                  <span>Measures tempo shifts, silence gaps, pitch range, and volume consistency.</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-[#315B50] font-bold">3.</span>
-                  <span>Pinpoints exact seconds where delivery drifted and provides coaching advice.</span>
-                </li>
-              </ul>
-            </div>
+        </main>
 
+        {/* ========================================================= */}
+        {/* RIGHT PANEL: Results (360px)                             */}
+        {/* ========================================================= */}
+        <aside className="panel-right flex flex-col h-full bg-[#151A21] border-l border-[#2A333E] overflow-hidden">
+          
+          {/* Header */}
+          <div className="h-10 border-b border-[#2A333E] px-4 flex items-center justify-between shrink-0 bg-[#151A21]">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
+              Evaluation & Flaw Grounding
+            </span>
+            {analysisData && (
+              <span className="text-[11px] font-mono text-[#E6EAF0]">
+                {analysisData.flaw_regions.length} flaw regions
+              </span>
+            )}
           </div>
 
-          {/* ======================================================= */}
-          {/* RIGHT: Results & Feedback Card                          */}
-          {/* ======================================================= */}
-          <div className="lg:col-span-7 flex flex-col gap-4">
-            
-            {analysisData ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col gap-5">
-                
-                {/* 1. Audio Player Header */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">
-                        {audioFile ? audioFile.name : 'Sample_Recording.wav'}
-                      </h3>
-                      <p className="text-xs text-slate-500 font-mono">
-                        {formatTime(currentTime)} / {formatTime(maxTime)}
-                      </p>
-                    </div>
-
-                    {/* Speed Selector */}
-                    <div className="flex items-center space-x-1 bg-white border border-slate-200 p-0.5 rounded-lg text-xs">
-                      {[0.8, 1.0, 1.2].map(rate => (
-                        <button
-                          key={rate}
-                          onClick={() => changePlaybackRate(rate)}
-                          className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                            playbackRate === rate ? 'bg-[#315B50] text-white' : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          {rate}x
-                        </button>
-                      ))}
-                    </div>
+          {analysisData ? (
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              
+              {/* Fixed Top Section: Overall Score + Subscores (solid bg-1 #151A21) */}
+              <div className="shrink-0 bg-[#151A21] border-b border-[#2A333E]">
+                {/* Overall Score & Grade Card */}
+                <div className="p-4 border-b border-[#2A333E]">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1]">
+                      Overall Score
+                    </span>
                   </div>
 
-                  {/* Play/Pause & Scrubber */}
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={togglePlay}
-                      className="w-10 h-10 rounded-full bg-[#315B50] hover:bg-[#26483F] text-white flex items-center justify-center shrink-0 cursor-pointer shadow-sm transition-transform active:scale-95"
+                  <div className="flex items-baseline space-x-3 mt-1.5">
+                    <span
+                      className="text-4xl font-mono font-bold tabular tracking-tight"
+                      style={{ color: getScoreColor(analysisData.scores.overall) }}
                     >
-                      {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 ml-0.5 fill-current" />}
-                    </button>
-
-                    {/* Timeline Scrubber */}
-                    <div
-                      className="relative flex-1 h-8 bg-white border border-slate-200 rounded-lg overflow-hidden cursor-pointer"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        const clickX = e.clientX - rect.left
-                        const targetSec = (clickX / rect.width) * maxTime
-                        seekToTime(targetSec)
+                      {Math.round(analysisData.scores.overall)}
+                    </span>
+                    <span className="text-sm font-mono text-[#9AA5B1]">/ 100</span>
+                    
+                    <span
+                      className="ml-auto text-lg font-mono font-bold px-2 py-0.5 rounded border"
+                      style={{
+                        color: getScoreColor(analysisData.scores.overall),
+                        borderColor: `${getScoreColor(analysisData.scores.overall)}40`,
+                        backgroundColor: `${getScoreColor(analysisData.scores.overall)}15`,
                       }}
                     >
-                      {/* Flaw highlights on the timeline */}
-                      {analysisData.flaw_regions.map((flaw, idx) => {
-                        const leftPct = (flaw.start / maxTime) * 100
-                        const widthPct = Math.max(2.5, ((flaw.end - flaw.start) / maxTime) * 100)
-                        const cfg = FLAW_TYPES[flaw.flaw_type] || { bg: '#FEF2F2', color: '#EF4444' }
-                        const isHovered = activeFlawHover === idx
+                      Grade {getGrade(analysisData.scores.overall)}
+                    </span>
+                  </div>
 
-                        return (
-                          <div
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              seekToTime(flaw.start)
-                            }}
-                            onMouseEnter={() => setActiveFlawHover(idx)}
-                            onMouseLeave={() => setActiveFlawHover(null)}
-                            className={`absolute top-0 bottom-0 border-x transition-all z-10 ${
-                              isHovered ? 'ring-2 ring-[#315B50]' : ''
-                            }`}
-                            style={{
-                              left: `${leftPct}%`,
-                              width: `${widthPct}%`,
-                              backgroundColor: cfg.bg,
-                              borderColor: cfg.color
-                            }}
-                            title={`Jump to ${flaw.start}s`}
-                          />
-                        )
-                      })}
+                  <div className="text-xs text-[#9AA5B1] mt-1 font-mono">
+                    {getGradeLabel(getGrade(analysisData.scores.overall))} delivery classification
+                  </div>
+                </div>
 
-                      {/* Playhead */}
+                {/* Five Subscore Rows */}
+                <div className="p-4 space-y-2.5">
+                  <SubscoreRow label="Pacing" score={analysisData.scores.pacing} weight="25%" color="#E69F00" />
+                  <SubscoreRow label="Pauses" score={analysisData.scores.pauses} weight="20%" color="#56B4E9" />
+                  <SubscoreRow label="Pitch variation" score={analysisData.scores.pitch_variation} weight="20%" color="#CC79A7" />
+                  <SubscoreRow label="Energy" score={analysisData.scores.energy} weight="15%" color="#F0E442" />
+                  <SubscoreRow label="Clarity" score={analysisData.scores.clarity} weight="20%" color="#D55E00" />
+                </div>
+              </div>
+
+              {/* Scrollable Flaw Items List */}
+              <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-2">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-[#9AA5B1] mb-1">
+                  Grounded Flaw Items
+                </div>
+
+                {analysisData.flaw_regions.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-[#9AA5B1] font-mono">
+                    Zero flaw regions detected.
+                  </div>
+                ) : (
+                  analysisData.flaw_regions.map((flaw, idx) => {
+                    const color = getFlawColor(flaw.flaw_type)
+                    const isHovered = hoveredFlawIndex === idx
+                    const isActive = activeFlawIndex === idx
+
+                    return (
                       <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-[#315B50] z-20 pointer-events-none"
-                        style={{ left: `${(currentTime / maxTime) * 100}%` }}
+                        key={idx}
+                        onClick={() => {
+                          setActiveFlawIndex(idx)
+                          seekToTime(flaw.start)
+                        }}
+                        onMouseEnter={() => setHoveredFlawIndex(idx)}
+                        onMouseLeave={() => setHoveredFlawIndex(null)}
+                        className={`p-2.5 rounded border transition-colors cursor-pointer bg-[#0E1116] ${
+                          isHovered || isActive
+                            ? 'border-[#2FBF9B] ring-1 ring-[#2FBF9B]'
+                            : 'border-[#2A333E] hover:border-[#3B4756]'
+                        }`}
                       >
-                        <div className="w-2.5 h-2.5 -ml-1 rounded-full bg-[#315B50] -mt-0.5"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-500">
-                    💡 Colored sections on the timeline indicate moments where your delivery drifted. Click any color to listen.
-                  </p>
-                </div>
-
-                {/* 2. Simple Tabs (Scores vs Flaws vs Charts) */}
-                <div className="flex border-b border-slate-200">
-                  <button
-                    onClick={() => setActiveTab('scores')}
-                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'scores'
-                        ? 'border-[#315B50] text-[#315B50]'
-                        : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <BarChart3 className="w-3.5 h-3.5" />
-                    Overall Scores
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('flaws')}
-                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'flaws'
-                        ? 'border-[#315B50] text-[#315B50]'
-                        : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <ListFilter className="w-3.5 h-3.5" />
-                    Moments to Improve ({analysisData.flaw_regions.length})
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('charts')}
-                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'charts'
-                        ? 'border-[#315B50] text-[#315B50]'
-                        : 'border-transparent text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <LineChart className="w-3.5 h-3.5" />
-                    Pitch & Pace Curves
-                  </button>
-                </div>
-
-                {/* TAB 1: OVERALL SCORES */}
-                {activeTab === 'scores' && (
-                  <div className="flex flex-col gap-4">
-                    {/* Big Score Card */}
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 rounded-xl bg-white border-2 border-[#315B50] flex flex-col items-center justify-center shrink-0 shadow-2xs">
-                          <span className="text-2xl font-black text-[#315B50] leading-none">
-                            {analysisData.scores.overall}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">/ 100</span>
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-                            Overall Delivery Rating
-                          </span>
-                          <h4 className="text-base font-extrabold text-slate-900">
-                            {analysisData.scores.overall >= 88 ? 'Near Perfect Delivery' :
-                             analysisData.scores.overall >= 70 ? 'Competent Delivery' :
-                             analysisData.scores.overall >= 50 ? 'Needs Attention' : 'Noticeably Flawed'}
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {analysisData.flaw_regions.length === 0
-                              ? 'Smooth cadence and natural pauses throughout.'
-                              : `${analysisData.flaw_regions.length} area(s) detected where delivery drifted.`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                        analysisData.scores.overall >= 70
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
-                        Grade {analysisData.scores.overall >= 88 ? 'A' : analysisData.scores.overall >= 70 ? 'B+' : 'C'}
-                      </span>
-                    </div>
-
-                    {/* 5 Simple Metric Bars */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <SimpleScoreBar
-                        title="Pacing & Speed"
-                        score={analysisData.scores.pacing}
-                        hint="Consistency in words per minute"
-                        color="bg-rose-500"
-                      />
-                      <SimpleScoreBar
-                        title="Pauses & Silence"
-                        score={analysisData.scores.pauses}
-                        hint="Natural breaks between thoughts"
-                        color="bg-amber-500"
-                      />
-                      <SimpleScoreBar
-                        title="Pitch & Melody"
-                        score={analysisData.scores.pitch_variation}
-                        hint="Vocal inflection and emphasis"
-                        color="bg-purple-500"
-                      />
-                      <SimpleScoreBar
-                        title="Vocal Projection"
-                        score={analysisData.scores.energy}
-                        hint="Steadiness in speech volume"
-                        color="bg-sky-500"
-                      />
-                      <div className="sm:col-span-2">
-                        <SimpleScoreBar
-                          title="Articulation & Clarity"
-                          score={analysisData.scores.clarity}
-                          hint="Clean speech without slurring"
-                          color="bg-emerald-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 2: MOMENTS TO IMPROVE */}
-                {activeTab === 'flaws' && (
-                  <div className="space-y-3">
-                    {analysisData.flaw_regions.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500 text-xs">
-                        🎉 No major flaws detected! Your delivery aligns well with the reference speaker.
-                      </div>
-                    ) : (
-                      analysisData.flaw_regions.map((flaw, idx) => {
-                        const cfg = FLAW_TYPES[flaw.flaw_type] || {
-                          label: flaw.title || flaw.flaw_type,
-                          badge: 'bg-red-50 text-red-700 border-red-200',
-                          simpleExplain: flaw.perceptual_impact,
-                          simpleTip: flaw.actionable_tip
-                        }
-                        const isHovered = activeFlawHover === idx
-
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => seekToTime(flaw.start)}
-                            onMouseEnter={() => setActiveFlawHover(idx)}
-                            onMouseLeave={() => setActiveFlawHover(null)}
-                            className={`p-3.5 rounded-xl border transition-all cursor-pointer bg-slate-50 hover:bg-white ${
-                              isHovered ? 'ring-2 ring-[#315B50] border-[#315B50]' : 'border-slate-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${cfg.badge}`}>
-                                {cfg.label}
-                              </span>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs font-mono text-slate-500">
-                                  {flaw.time_span}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    seekToTime(flaw.start)
-                                  }}
-                                  className="text-xs font-bold text-[#315B50] hover:underline"
-                                >
-                                  ▶ Listen
-                                </button>
-                              </div>
-                            </div>
-
-                            {flaw.words && (
-                              <p className="text-xs text-slate-800 italic bg-white p-2 rounded-lg border border-slate-200 mb-2">
-                                "{flaw.words}"
-                              </p>
-                            )}
-
-                            <p className="text-xs text-slate-600 mb-2">
-                              {cfg.simpleExplain || flaw.perceptual_impact}
-                            </p>
-
-                            <div className="bg-[#EEF3EF] border border-indigo-100 p-2.5 rounded-lg text-xs text-indigo-900 flex items-start gap-1.5">
-                              <span className="font-bold text-[#315B50]">Tip:</span>
-                              <span>{cfg.simpleTip || flaw.actionable_tip}</span>
-                            </div>
+                        {/* Header: Dot + Type + Time Range */}
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center space-x-1.5">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="text-xs font-semibold text-[#E6EAF0]">
+                              {getFlawLabel(flaw.flaw_type)}
+                            </span>
                           </div>
-                        )
-                      })
-                    )}
-                  </div>
-                )}
+                          <span className="tabular font-mono text-[11px] text-[#9AA5B1]">
+                            {formatRange(flaw.start, flaw.end)}
+                          </span>
+                        </div>
 
-                {/* TAB 3: PITCH & PACE CURVES */}
-                {activeTab === 'charts' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
-                      <span className="text-slate-500">Compare your trajectory against the reference:</span>
-                      <div className="flex items-center space-x-3 font-semibold">
-                        <span className="flex items-center gap-1 text-[#315B50]">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#315B50]"></span> You
-                        </span>
-                        <span className="flex items-center gap-1 text-emerald-600">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Reference
-                        </span>
+                        {/* Words Spoken Snippet in single-line ellipsis box */}
+                        {flaw.words && (
+                          <div className="text-xs text-[#E6EAF0] italic bg-[#151A21] px-2 py-1 rounded border border-[#2A333E] mb-1.5 font-sans truncate">
+                            "{flaw.words}"
+                          </div>
+                        )}
+
+                        {/* Numeric evidence as small mono text */}
+                        {flaw.evidence && (
+                          <div className="text-[10px] font-mono text-[#9AA5B1] mb-1.5 tabular leading-relaxed">
+                            {flaw.evidence.participant_val} vs {flaw.evidence.baseline_val} {flaw.evidence.unit} ({flaw.evidence.pct_change > 0 ? '+' : ''}{flaw.evidence.pct_change}%, z={flaw.evidence.z_score}); {flaw.evidence.detail}
+                          </div>
+                        )}
+
+                        {/* Causal Explanation in text-2 color */}
+                        <p className="text-xs text-[#9AA5B1] leading-relaxed mb-1.5">
+                          {flaw.perceptual_impact || flaw.description}
+                        </p>
+
+                        {/* Actionable Coach Tip grouped under 'Fix' in text-2 color (not bright green) */}
+                        <div className="text-[11px] text-[#9AA5B1] font-mono flex items-start gap-1">
+                          <span className="shrink-0 font-bold text-[#9AA5B1]">Fix:</span>
+                          <span className="text-[#9AA5B1]">{flaw.actionable_tip}</span>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Chart 1: Pitch */}
-                    <SimpleChart
-                      title="Pitch Variation (Inflection & Tone)"
-                      unit="semitones"
-                      maxTime={maxTime}
-                      currentTime={currentTime}
-                      pSeries={analysisData.time_series.participant.pitch}
-                      bSeries={analysisData.time_series.baseline.pitch}
-                      pTimes={analysisData.time_series.participant.times}
-                      bTimes={analysisData.time_series.baseline.times}
-                      yMin={-8}
-                      yMax={8}
-                      onSeek={seekToTime}
-                    />
-
-                    {/* Chart 2: Volume */}
-                    <SimpleChart
-                      title="Speaking Volume & Energy"
-                      unit="loudness"
-                      maxTime={maxTime}
-                      currentTime={currentTime}
-                      pSeries={analysisData.time_series.participant.energy}
-                      bSeries={analysisData.time_series.baseline.energy}
-                      pTimes={analysisData.time_series.participant.times}
-                      bTimes={analysisData.time_series.baseline.times}
-                      yMin={-3.0}
-                      yMax={2.5}
-                      onSeek={seekToTime}
-                    />
-
-                    {/* Chart 3: Cadence */}
-                    <SimpleChart
-                      title="Speaking Speed Over Time"
-                      unit="syllables / sec"
-                      maxTime={maxTime}
-                      currentTime={currentTime}
-                      pSeries={analysisData.time_series.participant.rate}
-                      bSeries={analysisData.time_series.baseline.rate}
-                      pTimes={analysisData.time_series.participant.times}
-                      bTimes={analysisData.time_series.baseline.times}
-                      yMin={0.0}
-                      yMax={7.0}
-                      onSeek={seekToTime}
-                    />
-                  </div>
+                    )
+                  })
                 )}
-
               </div>
-            ) : (
-              /* Simple Initial Empty State */
-              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center flex flex-col items-center justify-center min-h-[420px] shadow-xs">
-                <div className="w-14 h-14 rounded-2xl bg-[#EEF3EF] text-[#315B50] flex items-center justify-center mb-4">
-                  <Mic className="h-7 w-7" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-1">
-                  No recording analyzed yet
-                </h3>
-                <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
-                  Choose a recording or load the sample to view the results here.
-                </p>
-                <button
-                  onClick={handleLoadDemo}
-                  disabled={loading}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#315B50] text-white hover:bg-[#26483F] transition-colors cursor-pointer"
-                >
-                  Load sample recording
-                </button>
-              </div>
-            )}
 
-          </div>
+            </div>
+          ) : (
+            /* Right panel empty state */
+            <div className="flex-1 flex items-center justify-center p-6 text-center text-xs text-[#9AA5B1] font-mono">
+              Analysis results will appear here once audio is submitted.
+            </div>
+          )}
 
-        </div>
+        </aside>
 
-      </main>
-
-      {/* Clean Human Footer */}
-      <footer id="team" className="border-t border-slate-200 bg-white py-5 mt-auto">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-          <div>
-            <span className="font-bold text-slate-800">SpeechFlaw</span> • Speech delivery project
-          </div>
-          <div>
-            Built with ❤️ by Team <b>Cheetah</b> — Priyanshu Kumar Singh, Prince Kumar, Pratham Gupta, Pradhan Mahatha
-          </div>
-        </div>
-      </footer>
+      </div>
 
     </div>
   )
 }
 
-function SimpleScoreBar({ title, score, hint, color }) {
+function SubscoreRow({ label, score, weight, color }) {
+  const rounded = Math.round(score)
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-      <div className="flex justify-between items-center text-xs mb-1">
-        <span className="font-bold text-slate-800">{title}</span>
-        <span className="font-extrabold text-slate-900">{score}/100</span>
+    <div title={`Weight: ${weight}`} className="group cursor-help">
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="text-[#E6EAF0] group-hover:text-[#2FBF9B] transition-colors">{label}</span>
+        <span className="tabular font-mono font-semibold text-[#E6EAF0]">{rounded}</span>
       </div>
-      <p className="text-[11px] text-slate-400 mb-2">{hint}</p>
-      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+      <div className="w-full h-1 bg-[#1C232C] rounded-full overflow-hidden">
         <div
-          className={`h-full ${color} rounded-full transition-all duration-500`}
-          style={{ width: `${Math.max(5, score)}%` }}
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${Math.max(4, rounded)}%`, backgroundColor: color }}
         />
       </div>
     </div>
   )
 }
 
-function SimpleChart({
+function PlotlyTrackChart({
+  chartRef,
   title,
   unit,
   maxTime,
   currentTime,
-  pSeries,
-  bSeries,
   pTimes,
+  pSeries,
   bTimes,
+  bSeries,
+  flaws,
+  hoveredFlawIndex,
   yMin,
   yMax,
   onSeek
 }) {
-  const chartHeight = 70
-  const chartWidth = 600
+  const containerRef = useRef(null)
 
-  const scaleX = (t) => (t / maxTime) * chartWidth
-  const scaleY = (v) => {
-    if (v === null || isNaN(v)) return null
-    const clamped = Math.max(yMin, Math.min(yMax, v))
-    const ratio = (clamped - yMin) / (yMax - yMin)
-    return chartHeight - ratio * chartHeight
-  }
+  // Initial plot and data updates
+  useEffect(() => {
+    if (!containerRef.current || !pTimes || !pSeries) return
 
-  const buildSvgPath = (times, values) => {
-    let d = ''
-    let isDrawing = false
-    for (let i = 0; i < times.length; i++) {
-      const x = scaleX(times[i])
-      const y = scaleY(values[i])
-      if (y === null) {
-        isDrawing = false
-      } else {
-        if (!isDrawing) {
-          d += ` M ${x.toFixed(1)} ${y.toFixed(1)}`
-          isDrawing = true
-        } else {
-          d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`
-        }
+    const traces = [
+      {
+        x: bTimes,
+        y: bSeries,
+        mode: 'lines',
+        name: 'Baseline',
+        line: { color: '#8B96A3', width: 1.5, dash: 'dash' },
+        hoverinfo: 'y+name',
+      },
+      {
+        x: pTimes,
+        y: pSeries,
+        mode: 'lines',
+        name: 'Participant',
+        line: { color: '#2FBF9B', width: 2 },
+        hoverinfo: 'y+name',
+      },
+    ]
+
+    const shapes = [
+      // Shaded flaw region rectangles + 2px top strip in flaw color (layer: "below")
+      ...flaws.flatMap((flaw, idx) => {
+        const isHovered = hoveredFlawIndex === idx
+        const color = getFlawColor(flaw.flaw_type)
+        return [
+          {
+            type: 'rect',
+            xref: 'x',
+            yref: 'paper',
+            x0: flaw.start,
+            x1: flaw.end,
+            y0: 0,
+            y1: 1,
+            fillcolor: getFlawRgba(flaw.flaw_type, isHovered ? 0.28 : 0.14),
+            line: {
+              width: 0,
+              color: 'transparent',
+            },
+            layer: 'below',
+          },
+          {
+            type: 'line',
+            xref: 'x',
+            yref: 'paper',
+            x0: flaw.start,
+            x1: flaw.end,
+            y0: 1,
+            y1: 1,
+            line: {
+              color: color,
+              width: 2,
+            },
+            layer: 'below',
+          },
+        ]
+      }),
+      // Synchronized vertical playhead line
+      {
+        type: 'line',
+        xref: 'x',
+        yref: 'paper',
+        x0: currentTime,
+        x1: currentTime,
+        y0: 0,
+        y1: 1,
+        line: {
+          color: '#E6EAF0',
+          width: 1.5,
+        },
+      },
+    ]
+
+    const layout = {
+      autosize: true,
+      // Margin: left 50px aligns exactly with WaveSurfer pl-[50px], right 20px aligns with pr-[20px]
+      margin: { l: 50, r: 20, t: 20, b: 20 },
+      paper_bgcolor: 'transparent',
+      plot_bgcolor: 'transparent',
+      showlegend: false,
+      hovermode: 'x unified',
+      title: {
+        text: title,
+        font: { family: 'IBM Plex Sans, sans-serif', size: 10, color: '#9AA5B1' },
+        x: 0.05,
+        y: 0.95,
+      },
+      xaxis: {
+        range: [0, maxTime],
+        showgrid: true,
+        gridcolor: '#2A333E',
+        zeroline: false,
+        tickfont: { family: 'IBM Plex Mono, monospace', size: 9, color: '#9AA5B1' },
+        fixedrange: true,
+      },
+      yaxis: {
+        range: [yMin, yMax],
+        showgrid: true,
+        gridcolor: '#2A333E',
+        zeroline: false,
+        tickfont: { family: 'IBM Plex Mono, monospace', size: 9, color: '#9AA5B1' },
+        fixedrange: true,
+      },
+      shapes,
+    }
+
+    Plotly.react(containerRef.current, traces, layout, {
+      responsive: true,
+      displayModeBar: false,
+    })
+
+    const el = containerRef.current
+    const clickHandler = (data) => {
+      if (data && data.points && data.points.length > 0) {
+        onSeek(data.points[0].x)
       }
     }
-    return d
-  }
 
-  const pPath = buildSvgPath(pTimes, pSeries)
-  const bPath = buildSvgPath(bTimes, bSeries)
+    el.on('plotly_click', clickHandler)
+
+    return () => {
+      if (el && el.removeAllListeners) {
+        el.removeAllListeners('plotly_click')
+      }
+    }
+  }, [pTimes, pSeries, bTimes, bSeries, flaws, hoveredFlawIndex, maxTime, yMin, yMax, onSeek])
+
+  // Fast playhead position update on currentTime change
+  useEffect(() => {
+    if (!containerRef.current || !containerRef.current.layout) return
+    const shapes = containerRef.current.layout.shapes || []
+    if (shapes.length > 0) {
+      const playheadIdx = shapes.length - 1
+      Plotly.relayout(containerRef.current, {
+        [`shapes[${playheadIdx}].x0`]: currentTime,
+        [`shapes[${playheadIdx}].x1`]: currentTime,
+      })
+    }
+  }, [currentTime])
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-      <div className="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
-        <span className="text-slate-800 font-bold">{title}</span>
-        <span className="text-[10px] text-slate-400">[{unit}]</span>
-      </div>
-
-      <div
-        className="relative w-full h-[70px] cursor-pointer overflow-hidden rounded bg-white border border-slate-200"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect()
-          const clickX = e.clientX - rect.left
-          const sec = (clickX / rect.width) * maxTime
-          onSeek(sec)
-        }}
-      >
-        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" className="w-full h-full">
-          {/* Subtle center line */}
-          <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="#F1F5F9" />
-
-          {/* Reference Curve (Green) */}
-          <path d={bPath} fill="none" stroke="#10B981" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-
-          {/* You Curve (Purple) */}
-          <path d={pPath} fill="none" stroke="#315B50" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round" />
-
-          {/* Playhead */}
-          <line
-            x1={scaleX(currentTime)}
-            y1="0"
-            x2={scaleX(currentTime)}
-            y2={chartHeight}
-            stroke="#1E293B"
-            strokeWidth="1.5"
-          />
-        </svg>
-      </div>
-    </div>
+    <div
+      ref={containerRef}
+      className="w-full flex-1 min-h-[140px] border border-[#2A333E] rounded bg-[#0E1116] overflow-hidden"
+    />
   )
 }

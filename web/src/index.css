@@ -3,41 +3,139 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  --bg-0: #0E1116;
+  --bg-1: #151A21;
+  --bg-2: #1C232C;
+  --border: #2A333E;
+  --text-1: #E6EAF0;
+  --text-2: #9AA5B1;
+  --accent: #2FBF9B;
+  --baseline: #8B96A3;
+
+  --flaw-pacing: #E69F00;
+  --flaw-pauses: #56B4E9;
+  --flaw-pitch: #CC79A7;
+  --flaw-energy: #F0E442;
+  --flaw-clarity: #D55E00;
 }
 
-body {
+html, body, #root {
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
   margin: 0;
-  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #F6F8FC;
-  color: #1E293B;
-  overflow-x: hidden;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-0);
+  color: var(--text-1);
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom sleek scrollbar */
+/* Tabular figures for numbers, timers, coordinates */
+.tabular {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom dark scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 4px;
+  background: var(--border);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #3B4756;
 }
 
-/* Audio Waveform Animation */
-@keyframes soundwave {
-  0%, 100% { height: 25%; }
-  50% { height: 95%; }
+/* Suppress Netlify injected badges and collaboration drawers */
+[data-netlify-deploy-preview],
+[data-netlify-drawer],
+#netlify-badge,
+.netlify-badge,
+#netlify-drawer-container,
+div[class*="netlify-drawer"],
+iframe[src*="netlify"] {
+  display: none !important;
 }
 
-.animate-soundwave {
-  animation: soundwave 1.2s ease-in-out infinite;
+/* Tool styles */
+input, select, textarea {
+  font-family: inherit;
+  color: var(--text-1);
+}
+
+select option {
+  background-color: var(--bg-1);
+  color: var(--text-1);
+}
+
+/* App Grid Layout Spec */
+.app-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  height: calc(100dvh - 48px);
+  width: 100vw;
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .app-grid {
+    grid-template-columns: 300px minmax(0, 1fr);
+    overflow-y: auto;
+    height: calc(100dvh - 48px);
+  }
+  .panel-right {
+    grid-column: 2;
+    border-left: none !important;
+    border-top: 1px solid var(--border);
+    height: auto !important;
+    min-height: 480px;
+  }
+}
+
+@media (max-width: 800px) {
+  .app-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow-y: auto;
+  }
+  .panel-left {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+    height: auto !important;
+  }
+  .panel-center {
+    height: auto !important;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-right {
+    grid-column: 1;
+    border-left: none !important;
+    height: auto !important;
+  }
+}
+
+/* Plotly container resets */
+.js-plotly-plot .plotly .modebar {
+  display: none !important;
+}
+
+.js-plotly-plot .plotly .main-svg {
+  background: transparent !important;
+}
+
+.js-plotly-plot .plotly svg {
+  background: transparent !important;
 }
 
 

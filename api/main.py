@@ -120,11 +120,16 @@ def downsample_series(times: np.ndarray, values: np.ndarray, target_fps: int = 2
 def run_pipeline(part_audio_path: str, transcript: str, base_audio_path: str):
     """Core analytics execution pipeline."""
     from speechflaw.audio_utils import probe_audio_duration
+    from speechflaw.align import validate_audio_transcript, normalize_transcript
     dur = probe_audio_duration(part_audio_path)
     if dur > 300.0:
         raise HTTPException(status_code=400, detail="Audio duration exceeds 5-minute limit (maximum 300 seconds).")
         
-    part_feat = extract_speech_features(part_audio_path, transcript=transcript, use_cache=True)
+    # 1. Input validation & transcript normalization
+    wer, warning, asr_text, asr_words = validate_audio_transcript(part_audio_path, transcript)
+    clean_transcript = normalize_transcript(transcript, asr_words) if transcript else asr_text
+        
+    part_feat = extract_speech_features(part_audio_path, transcript=clean_transcript, use_cache=True)
     base_feat = extract_speech_features(base_audio_path, use_cache=True)
     
     # Detect and explain flaws
@@ -144,6 +149,9 @@ def run_pipeline(part_audio_path: str, transcript: str, base_audio_path: str):
     return {
         "scores": scores,
         "flaw_regions": explained_flaws,
+        "warning": warning,
+        "wer": round(float(wer), 4),
+        "asr_transcript": asr_text,
         "summary": {
             "duration": round(float(dur), 2),
             "sample_rate": 16000,

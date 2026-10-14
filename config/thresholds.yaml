@@ -1,0 +1,50 @@
+# SpeechFlow Detection & Scoring Calibration Configuration
+# Multimodal AI Hackathon 2026 - Track C
+
+# Windowing parameters
+window_len_s: 1.5
+hop_step_s: 0.5
+min_consecutive_windows: 2
+min_region_length: 0.8  # seconds
+merge_gap: 0.5          # seconds
+max_flaw_regions: 8
+wer_warning_threshold: 0.5
+
+# Robust statistics thresholds (|robust z| > threshold)
+thresholds:
+  too_fast:
+    z_threshold: 3.0
+    dtw_slope_threshold: 1.25
+    min_rate_syl: 3.8
+  too_slow:
+    z_threshold: -3.0
+    dtw_slope_threshold: 0.85
+    max_rate_syl: 2.3
+  long_pauses:
+    z_threshold: 3.0
+    min_pause_sec: 0.8
+  missing_pauses:
+    z_threshold: -3.0
+    max_pause_ratio: 0.08
+  monotone:
+    z_threshold: -3.0
+    max_var_ratio: 0.35
+  volume_drop:
+    z_threshold: -3.0
+    delta_db_threshold: -7.5
+  pitch_spike:
+    z_threshold: 3.0
+    delta_st_threshold: 2.6
+  stumble_filler:
+    z_threshold: 3.0
+
+# Scoring calibration weights and multipliers
+scoring:
+  baseline_floor: 98.0
+  l5_target_min: 80.0
+  l5_target_max: 95.0
+  l1_target_max: 35.0
+  per_region_penalty: 22.0
+  coherence_penalty: 6.0
+  multi_flaw_compound: 16.5
+  max_subscore_penalty: 95.0
