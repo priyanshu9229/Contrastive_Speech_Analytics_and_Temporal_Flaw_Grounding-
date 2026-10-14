@@ -27,3 +27,9 @@ Thumbs.db
 
 # Runtime temporary uploads
 data/dataset/current_participant.wav
+
+# Private team assets (not for public repo)
+private/
+*video_script*
+*videoscript*
+*DEMO_VIDEO_SCRIPT*
