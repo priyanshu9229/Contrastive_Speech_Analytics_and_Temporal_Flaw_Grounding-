@@ -24,3 +24,6 @@ cache/*.npz
 .DS_Store
 Thumbs.db
 *.swp
+
+# Runtime temporary uploads
+data/dataset/current_participant.wav

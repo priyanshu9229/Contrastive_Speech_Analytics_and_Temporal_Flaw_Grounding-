@@ -119,9 +119,9 @@ def downsample_series(times: np.ndarray, values: np.ndarray, target_fps: int = 2
 
 def run_pipeline(part_audio_path: str, transcript: str, base_audio_path: str):
     """Core analytics execution pipeline."""
-    # Check duration limit (max 5 minutes = 300 seconds)
-    part_info = sf.info(part_audio_path)
-    if part_info.duration > 300.0:
+    from speechflaw.audio_utils import probe_audio_duration
+    dur = probe_audio_duration(part_audio_path)
+    if dur > 300.0:
         raise HTTPException(status_code=400, detail="Audio duration exceeds 5-minute limit (maximum 300 seconds).")
         
     part_feat = extract_speech_features(part_audio_path, transcript=transcript, use_cache=True)
@@ -145,8 +145,8 @@ def run_pipeline(part_audio_path: str, transcript: str, base_audio_path: str):
         "scores": scores,
         "flaw_regions": explained_flaws,
         "summary": {
-            "duration": round(float(part_info.duration), 2),
-            "sample_rate": part_info.samplerate,
+            "duration": round(float(dur), 2),
+            "sample_rate": 16000,
             "flaw_count": len(explained_flaws),
             "overall_score": scores["overall"]
         },
@@ -211,24 +211,36 @@ async def analyze_speech(
     baseline_id: Optional[str] = Form("stay_hungry"),
     baseline_audio: Optional[UploadFile] = File(None)
 ):
-    # Validate file extension
     ext = os.path.splitext(participant_audio.filename)[1].lower()
-    if ext not in [".wav", ".mp3", ".m4a", ".ogg", ".flac"]:
-        raise HTTPException(status_code=400, detail=f"Unsupported audio format '{ext}'. Please upload WAV, MP3, M4A, or OGG.")
+    if ext not in [".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac"]:
+        raise HTTPException(status_code=400, detail=f"Unsupported audio format '{ext}'. Please upload WAV, MP3, M4A, AAC, or OGG.")
         
     temp_dir = tempfile.mkdtemp(prefix="speechflaw_")
-    part_path = os.path.join(temp_dir, f"participant{ext}")
+    raw_part_path = os.path.join(temp_dir, f"participant_raw{ext}")
     
     try:
-        with open(part_path, "wb") as f:
+        with open(raw_part_path, "wb") as f:
             shutil.copyfileobj(participant_audio.file, f)
+            
+        # Transcode non-WAV formats (such as M4A, AAC) to clean 16kHz mono WAV
+        from speechflaw.audio_utils import convert_to_wav
+        if ext != ".wav":
+            part_path = os.path.join(temp_dir, "participant.wav")
+            convert_to_wav(raw_part_path, part_path, target_sr=16000)
+        else:
+            part_path = raw_part_path
             
         # Determine baseline audio
         if baseline_audio is not None and baseline_audio.filename:
             b_ext = os.path.splitext(baseline_audio.filename)[1].lower()
-            base_path = os.path.join(temp_dir, f"custom_baseline{b_ext}")
-            with open(base_path, "wb") as f:
+            raw_base_path = os.path.join(temp_dir, f"custom_baseline_raw{b_ext}")
+            with open(raw_base_path, "wb") as f:
                 shutil.copyfileobj(baseline_audio.file, f)
+            if b_ext != ".wav":
+                base_path = os.path.join(temp_dir, "custom_baseline.wav")
+                convert_to_wav(raw_base_path, base_path, target_sr=16000)
+            else:
+                base_path = raw_base_path
         else:
             base_path = f"data/raw/{baseline_id}.wav"
             if not os.path.exists(base_path):
@@ -243,7 +255,13 @@ async def analyze_speech(
             else:
                 transcript = ""
                 
+        # Expose transcoded participant audio for guaranteed universal web playback
+        os.makedirs("data/dataset", exist_ok=True)
+        static_wav = "data/dataset/current_participant.wav"
+        shutil.copyfile(part_path, static_wav)
+        
         result = run_pipeline(part_path, transcript, base_path)
+        result["audio_url"] = "/static/dataset/current_participant.wav"
         return result
         
     finally:

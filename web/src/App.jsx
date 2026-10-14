@@ -124,6 +124,13 @@ export default function App() {
       }
       const data = await res.json()
       setAnalysisData(data)
+      if (data.audio_url) {
+        const fullAudioUrl = `${API_BASE}${data.audio_url}?t=${Date.now()}`
+        setAudioUrl(fullAudioUrl)
+        if (audioRef.current) {
+          audioRef.current.src = fullAudioUrl
+        }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -233,8 +240,8 @@ export default function App() {
               <label className="block text-xs font-medium text-slate-300 mb-1.5">Participant Audio Recording</label>
               <label className="flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed border-slate-700 bg-slate-900/60 hover:bg-slate-900/90 hover:border-slate-600 transition-all cursor-pointer text-xs text-slate-300 truncate">
                 <Upload className="h-4 w-4 mr-2 text-sky-400 shrink-0" />
-                <span className="truncate">{audioFile ? audioFile.name : 'Choose audio (.wav, .mp3)'}</span>
-                <input type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
+                <span className="truncate">{audioFile ? audioFile.name : 'Choose audio (.m4a, .mp3, .wav)'}</span>
+                <input type="file" accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg,.flac" onChange={handleFileUpload} className="hidden" />
               </label>
             </div>
 

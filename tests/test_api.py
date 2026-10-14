@@ -55,11 +55,19 @@ def test_analyze_endpoint_with_valid_audio():
     assert data["scores"]["overall"] >= 75.0
     assert "time_series" in data
 
-def test_analyze_unsupported_format_error():
-    response = client.post(
-        "/analyze",
-        files={"participant_audio": ("bad.exe", b"not audio", "application/octet-stream")},
-        data={"baseline_id": "stay_hungry"}
-    )
-    assert response.status_code == 400
-    assert "Unsupported audio format" in response.json()["detail"]
+def test_analyze_endpoint_with_m4a_audio():
+    m4a_path = "data/raw/test_sample.m4a"
+    assert os.path.exists(m4a_path)
+    
+    with open(m4a_path, "rb") as f:
+        response = client.post(
+            "/analyze",
+            files={"participant_audio": ("test_speech.m4a", f, "audio/mp4")},
+            data={"baseline_id": "stay_hungry"}
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert "scores" in data
+    assert data["scores"]["overall"] >= 80.0
+    assert "time_series" in data
+    assert data["audio_url"].endswith(".wav")

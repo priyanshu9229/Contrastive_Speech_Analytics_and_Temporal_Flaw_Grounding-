@@ -133,11 +133,8 @@ def extract_speech_features(
         except Exception:
             pass
 
-    y, file_sr = sf.read(audio_path)
-    if y.ndim > 1:
-        y = np.mean(y, axis=1)
-    if file_sr != sr:
-        y = librosa.resample(y, orig_sr=file_sr, target_sr=sr)
+    from speechflaw.audio_utils import load_audio
+    y, _ = load_audio(audio_path, target_sr=sr)
         
     duration = len(y) / sr
     n_frames = int(np.ceil(len(y) / hop_length))
