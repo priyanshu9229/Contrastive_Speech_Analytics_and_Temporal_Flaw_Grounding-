@@ -1,98 +1,91 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
-  Mic,
   Play,
   Pause,
-  RotateCcw,
   UploadCloud,
-  Sparkles,
-  AlertTriangle,
-  Award,
   Clock,
-  Layers,
-  ChevronRight,
-  TrendingUp,
   Volume2,
-  Activity,
-  FileText,
-  CheckCircle2,
+  ChevronRight,
+  Sparkles,
   Info,
-  Music,
+  CheckCircle,
+  FileAudio,
   ExternalLink,
-  ShieldCheck,
-  Headphones,
-  Sliders,
-  Check,
-  FileAudio
+  Mic,
+  RotateCcw,
+  BarChart3,
+  ListFilter,
+  LineChart,
+  Github
 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
-// Grounded flaw color schemes matching AudioEnhancer clean aesthetic
-const FLAW_CONFIG = {
+// Friendly human labels and clean styling for flaws
+const FLAW_TYPES = {
   too_fast: {
-    bg: '#FEF2F2',
-    border: '#F87171',
-    text: '#B91C1C',
+    label: 'Speaking Too Fast',
     badge: 'bg-red-50 text-red-700 border-red-200',
-    label: 'Too Fast',
-    iconColor: '#DC2626'
+    color: '#EF4444',
+    bg: '#FEF2F2',
+    simpleExplain: 'You rushed through this sentence faster than the standard pace.',
+    simpleTip: 'Take a calm breath and give key words extra space to land.'
   },
   too_slow: {
-    bg: '#FFF7ED',
-    border: '#FB923C',
-    text: '#C2410C',
+    label: 'Speaking Too Slow',
     badge: 'bg-orange-50 text-orange-700 border-orange-200',
-    label: 'Too Slow',
-    iconColor: '#EA580C'
+    color: '#F97316',
+    bg: '#FFF7ED',
+    simpleExplain: 'Your delivery dragged down here, making the sentence lose momentum.',
+    simpleTip: 'Pick up your cadence slightly to keep the listener engaged.'
   },
   missing_pauses: {
-    bg: '#FDF2F8',
-    border: '#F472B6',
-    text: '#BE185D',
+    label: 'No Break Between Sentences',
     badge: 'bg-pink-50 text-pink-700 border-pink-200',
-    label: 'Missing Pauses',
-    iconColor: '#DB2777'
+    color: '#EC4899',
+    bg: '#FDF2F8',
+    simpleExplain: 'Clauses ran together without natural punctuation pauses.',
+    simpleTip: 'Insert a 0.5-second pause at commas and full stops.'
   },
   long_pauses: {
-    bg: '#FEFCE8',
-    border: '#FACC15',
-    text: '#A16207',
+    label: 'Unusually Long Pause',
     badge: 'bg-amber-50 text-amber-800 border-amber-200',
-    label: 'Long Pause',
-    iconColor: '#D97706'
+    color: '#EAB308',
+    bg: '#FEFCE8',
+    simpleExplain: 'There was a prolonged hesitation or silence here.',
+    simpleTip: 'Keep pauses intentional (0.5s to 1.2s) so the flow stays intact.'
   },
   monotone: {
-    bg: '#FAF5FF',
-    border: '#C084FC',
-    text: '#6B21A8',
+    label: 'Monotone Pitch',
     badge: 'bg-purple-50 text-purple-700 border-purple-200',
-    label: 'Monotone',
-    iconColor: '#7E22CE'
+    color: '#8B5CF6',
+    bg: '#FAF5FF',
+    simpleExplain: 'Your voice stayed flat without pitch inflection or enthusiasm.',
+    simpleTip: 'Raise your pitch slightly on key nouns and emphasized verbs.'
   },
   volume_drop: {
-    bg: '#F0F9FF',
-    border: '#38BDF8',
-    text: '#0369A1',
+    label: 'Sudden Volume Drop',
     badge: 'bg-sky-50 text-sky-700 border-sky-200',
-    label: 'Volume Drop',
-    iconColor: '#0284C7'
+    color: '#0284C7',
+    bg: '#F0F9FF',
+    simpleExplain: 'Your voice dropped in volume toward the end of the phrase.',
+    simpleTip: 'Maintain steady breath support all the way through the end of the sentence.'
   },
   pitch_spike: {
-    bg: '#FFF1F2',
-    border: '#FB7185',
-    text: '#BE123C',
+    label: 'Sharp Pitch Spike',
     badge: 'bg-rose-50 text-rose-700 border-rose-200',
-    label: 'Pitch Spike',
-    iconColor: '#E11D48'
+    color: '#DC2626',
+    bg: '#FFF1F2',
+    simpleExplain: 'There was an abrupt jump in vocal pitch, sounding strained.',
+    simpleTip: 'Keep your vocal chords relaxed to avoid sudden strained jumps.'
   },
   stumble_filler: {
-    bg: '#F0FDFA',
-    border: '#2DD4BF',
-    text: '#0F766E',
+    label: 'Hesitation or Stumble',
     badge: 'bg-teal-50 text-teal-700 border-teal-200',
-    label: 'Stumble / Filler',
-    iconColor: '#0D9488'
+    color: '#0D9488',
+    bg: '#F0FDFA',
+    simpleExplain: 'Slight stumble, filler sound, or repeated syllable detected.',
+    simpleTip: 'It is okay to pause silently instead of using filler sounds.'
   },
 }
 
@@ -105,8 +98,8 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [analysisData, setAnalysisData] = useState(null)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('scores') // 'scores' | 'flaws' | 'charts'
   const [playbackRate, setPlaybackRate] = useState(1.0)
-  const [activeTab, setActiveTab] = useState('rubrics') // 'rubrics' | 'contours' | 'flaws'
   
   // Audio playback state
   const audioRef = useRef(null)
@@ -141,13 +134,13 @@ export default function App() {
     }
   }
 
-  // Load bundled demo analysis with one click
+  // Load sample demo with 1-click
   const handleLoadDemo = async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`${API_BASE}/demo`)
-      if (!res.ok) throw new Error('Failed to load demo data')
+      if (!res.ok) throw new Error('Could not load sample recording.')
       const data = await res.json()
       setAnalysisData(data)
       setTranscript(data.words.map(w => w.word).join(' '))
@@ -163,11 +156,11 @@ export default function App() {
     }
   }
 
-  // Submit audio for analysis
+  // Submit audio file for analysis
   const handleAnalyze = async (e) => {
     if (e) e.preventDefault()
     if (!audioFile) {
-      setError('Please select an audio file to analyze, or click "Try Sample Audio".')
+      setError('Please choose an audio file first, or click "Try Sample Audio".')
       return
     }
 
@@ -185,7 +178,7 @@ export default function App() {
       })
       if (!res.ok) {
         const errJson = await res.json()
-        throw new Error(errJson.detail || 'Analysis failed.')
+        throw new Error(errJson.detail || 'Analysis could not be completed.')
       }
       const data = await res.json()
       setAnalysisData(data)
@@ -243,134 +236,100 @@ export default function App() {
   }
 
   const formatTime = (secs) => {
-    if (!secs || isNaN(secs)) return '00:00'
+    if (!secs || isNaN(secs)) return '0:00'
     const m = Math.floor(secs / 60)
     const s = Math.floor(secs % 60)
-    const ms = Math.floor((secs % 1) * 10)
-    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}.${ms}`
+    return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
-  const maxTime = analysisData?.summary?.duration || duration || 25.0
+  const maxTime = analysisData?.summary?.duration || duration || 20.0
 
   return (
-    <div className="min-h-screen bg-[#F6F8FC] text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
       
-      {/* Top Header Navigation (AudioEnhancer Style) */}
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      {/* Simple, Human Top Navbar */}
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           
-          {/* Logo & Product Name */}
-          <div className="flex items-center space-x-3.5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#5B4DFB] to-[#7E6EFF] flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-              <Activity className="h-5 w-5" />
+          {/* Logo & Project Title */}
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5B4DFB] flex items-center justify-center text-white shadow-sm">
+              <Mic className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-extrabold tracking-tight text-slate-900">
-                  AudioEnhancer
-                </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#EEF0FF] text-[#5B4DFB] border border-indigo-100">
-                  Analyzer AI
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-                Multimodal Contrastive Speech Analytics & Temporal Flaw Grounding
-              </p>
+              <span className="text-base font-bold text-slate-900 tracking-tight">
+                SpeechFlaw
+              </span>
+              <span className="text-xs text-slate-500 block -mt-0.5">
+                Speech & Delivery Analyzer
+              </span>
             </div>
           </div>
 
-          {/* Center Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-1 text-xs font-semibold">
-            <span className="px-3.5 py-1.5 rounded-full bg-[#EEF0FF] text-[#5B4DFB]">
-              Audio File Analyzer
-            </span>
-            <a href="#rubrics" className="px-3.5 py-1.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
-              Rubrics
-            </a>
-            <a href="#time-series" className="px-3.5 py-1.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
-              Contour Alignment
-            </a>
-            <a href="#flaws" className="px-3.5 py-1.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
-              Grounded Flaws
-            </a>
+          {/* Simple Navigation Links */}
+          <nav className="hidden md:flex items-center space-x-6 text-xs font-semibold text-slate-600">
+            <span className="text-[#5B4DFB]">Analyzer</span>
+            <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How It Works</a>
+            <a href="#team" className="hover:text-slate-900 transition-colors">Team</a>
             <a
-              href="http://127.0.0.1:8000/docs"
+              href="https://github.com/priyanshu9229/Contrastive_Speech_Analytics_and_Temporal_Flaw_Grounding-"
               target="_blank"
               rel="noreferrer"
-              className="px-3.5 py-1.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1"
+              className="hover:text-slate-900 flex items-center gap-1 transition-colors"
             >
-              API Docs
-              <ExternalLink className="h-3 w-3" />
+              <Github className="h-3.5 w-3.5" />
+              GitHub
             </a>
           </nav>
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>FastAPI DTW Engine Online</span>
-            </div>
-
+          {/* Action button */}
+          <div className="flex items-center space-x-2.5">
             <button
               onClick={handleLoadDemo}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-[#EEF0FF] text-[#5B4DFB] border border-indigo-200 hover:bg-[#E0DCFF] transition-all flex items-center space-x-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F0EFFF] text-[#5B4DFB] hover:bg-[#E4E1FF] transition-colors cursor-pointer disabled:opacity-50"
             >
-              <Sparkles className="h-3.5 w-3.5 text-[#5B4DFB]" />
-              <span>Load Demo Speech</span>
+              Try Sample Audio
             </button>
           </div>
         </div>
       </header>
 
-      {/* Hero Headline Section */}
-      <section className="pt-10 pb-6 px-4 text-center max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EEF0FF] text-[#5B4DFB] text-xs font-semibold mb-3 border border-indigo-100 shadow-sm">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>AI-Powered Speech Flaw Grounder & Contrastive Analytics</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Audio File Analyzer{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5B4DFB] to-[#8C7BFF]">
-            & Temporal Flaw Grounding
-          </span>
+      {/* Simple, Human Hero Section */}
+      <section className="pt-8 pb-5 px-4 text-center max-w-3xl mx-auto">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+          Analyze Your Speech in Seconds
         </h1>
-        <p className="mt-3.5 text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          Analyze spoken audio files with our contrastive speech engine. Get instant insights into tempo drift, pitch excursions, energy drops, and grounded flaws with dynamic time warping.
+        <p className="mt-2.5 text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl mx-auto">
+          Upload any speech recording to get clear feedback on your pacing, pauses, pitch variation, and volume.
         </p>
 
-        {/* Feature Highlights Chips */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mt-5 text-xs text-slate-600 font-medium">
-          <span className="bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-1.5">
-            <FileAudio className="h-3.5 w-3.5 text-[#5B4DFB]" /> Universal M4A, WAV & MP3
+        {/* Clean, simple benefit tags */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs text-slate-600 font-medium">
+          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
+            🎧 Supports .m4a, .mp3, .wav
           </span>
-          <span className="bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-1.5">
-            <Activity className="h-3.5 w-3.5 text-[#5B4DFB]" /> Non-Linear DTW Alignment
+          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
+            ⚡ Instant pacing & rhythm check
           </span>
-          <span className="bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-[#5B4DFB]" /> Temporal Flaw Grounding
-          </span>
-          <span className="bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm flex items-center gap-1.5">
-            <Award className="h-3.5 w-3.5 text-[#5B4DFB]" /> 5-Metric Evaluative Rubric
+          <span className="bg-white px-3 py-1 rounded-full border border-slate-200 shadow-2xs">
+            🎯 Timeline playback & tips
           </span>
         </div>
       </section>
 
-      {/* Main 2-Column Tool Workspace */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16 flex-1 w-full flex flex-col gap-6">
+      {/* Main 2-Column Application Area */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 pb-14 flex-1 w-full">
         
         {/* Error Alert */}
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center justify-between text-sm shadow-sm animate-fadeIn">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
-              <span>{error}</span>
-            </div>
-            <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700 font-bold">✕</button>
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl mb-5 flex items-center justify-between text-sm">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700 font-bold ml-3">✕</button>
           </div>
         )}
 
-        {/* Hidden HTML Audio element for playback */}
+        {/* Hidden Audio Player */}
         <audio
           ref={audioRef}
           onTimeUpdate={(e) => setCurrentTime(e.target.currentTime)}
@@ -378,83 +337,63 @@ export default function App() {
           onEnded={() => setIsPlaying(false)}
         />
 
-        {/* 2-Column Grid */}
+        {/* The 2-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* ======================================================== */}
-          {/* LEFT COLUMN: AudioEnhancer Upload & Configuration Area  */}
-          {/* ======================================================== */}
+          {/* ======================================================= */}
+          {/* LEFT: Simple Upload Card                                */}
+          {/* ======================================================= */}
           <div className="lg:col-span-5 flex flex-col gap-5">
-            
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-5">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col gap-4">
               
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-[#EEF0FF] text-[#5B4DFB] flex items-center justify-center font-bold text-xs">
-                    1
-                  </div>
-                  <h2 className="font-bold text-slate-900 text-base">Upload Spoken Audio</h2>
-                </div>
-                <span className="text-[11px] font-semibold text-[#5B4DFB] bg-[#EEF0FF] px-2.5 py-0.5 rounded-full">
-                  Step 1 of 3
-                </span>
-              </div>
+              <h2 className="font-bold text-slate-900 text-base">
+                1. Upload Speech Audio
+              </h2>
 
-              {/* Iconic AudioEnhancer Dashed Dropzone */}
-              <label className="border-2 border-dashed border-[#CBD5E1] hover:border-[#5B4DFB] bg-[#F8FAFC] hover:bg-[#F0EFFF]/40 rounded-2xl p-7 flex flex-col items-center justify-center text-center cursor-pointer transition-all group relative">
+              {/* Clean Upload Drop Area */}
+              <label className="border-2 border-dashed border-slate-300 hover:border-[#5B4DFB] bg-slate-50 hover:bg-[#F0EFFF]/30 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group">
                 <input
                   type="file"
                   accept="audio/*,.m4a,.aac,.mp3,.wav,.ogg,.flac"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <div className="w-14 h-14 rounded-full bg-[#EEF0FF] group-hover:bg-[#E0DCFF] text-[#5B4DFB] flex items-center justify-center mb-3 transition-colors shadow-sm">
-                  <UploadCloud className="w-7 h-7" />
+                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 group-hover:border-[#5B4DFB] text-[#5B4DFB] flex items-center justify-center mb-2.5 shadow-2xs">
+                  <UploadCloud className="w-6 h-6" />
                 </div>
-                <div className="text-sm font-bold text-slate-800 group-hover:text-[#5B4DFB] transition-colors">
-                  Drop Audio to analyze media <span className="text-slate-400 font-normal">OR</span> <span className="text-[#5B4DFB] underline font-semibold">Upload Media</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Supports M4A, WAV, MP3, AAC, FLAC (Universal Ingestion)
+                <p className="text-sm font-semibold text-slate-800">
+                  Click to browse, or drag audio here
                 </p>
-                <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium">
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Max upload: 150 MB / 10 Mins</span>
-                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Works with iPhone Voice Memos (.m4a), MP3, WAV
+                </p>
               </label>
 
-              {/* Uploaded File Pill Preview */}
+              {/* Selected File Card */}
               {audioFile && (
-                <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
-                  <div className="flex items-center space-x-3 overflow-hidden">
-                    <div className="w-9 h-9 rounded-lg bg-[#5B4DFB] text-white flex items-center justify-center shrink-0">
-                      <FileAudio className="w-5 h-5" />
-                    </div>
-                    <div className="overflow-hidden">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5 overflow-hidden">
+                    <FileAudio className="w-5 h-5 text-[#5B4DFB] shrink-0" />
+                    <div className="truncate">
                       <p className="text-xs font-bold text-slate-800 truncate">{audioFile.name}</p>
-                      <p className="text-[11px] text-slate-500">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB • Ready</p>
+                      <p className="text-[11px] text-slate-500">{(audioFile.size / (1024 * 1024)).toFixed(1)} MB • Ready to analyze</p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                    Loaded
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+                    Selected
                   </span>
                 </div>
               )}
 
-              {/* Step 2: Reference Baseline Selector */}
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span className="h-5 w-5 rounded-md bg-[#EEF0FF] text-[#5B4DFB] flex items-center justify-center text-[10px] font-bold">2</span>
-                    Reference Gold Standard Speech
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-mono">Ground Truth Base</span>
-                </div>
+              {/* Step 2: Compare against reference */}
+              <div className="space-y-1 pt-1">
+                <label className="text-xs font-bold text-slate-800">
+                  2. Compare against reference speech:
+                </label>
                 <select
                   value={selectedBaseline}
                   onChange={handleBaselineChange}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#5B4DFB] focus:ring-2 focus:ring-[#5B4DFB]/10 transition-all cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-[#5B4DFB] cursor-pointer"
                 >
                   {baselines.map(b => (
                     <option key={b.id} value={b.id}>
@@ -462,129 +401,100 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-400">
-                  Target acoustic baseline for DTW non-linear alignment & tempo warping.
-                </p>
               </div>
 
-              {/* Step 3: Transcript Textarea */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span className="h-5 w-5 rounded-md bg-[#EEF0FF] text-[#5B4DFB] flex items-center justify-center text-[10px] font-bold">3</span>
-                    Spoken Transcript (Word-Level VAD)
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-mono">{transcript.length} chars</span>
-                </div>
+              {/* Step 3: Transcript (Simple / Collapsible) */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-800">
+                  3. Spoken text (optional):
+                </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="Speech transcript for forced alignment..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-[#5B4DFB] focus:ring-2 focus:ring-[#5B4DFB]/10 transition-all resize-none leading-relaxed"
+                  placeholder="Transcript for word-by-word alignment..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-[#5B4DFB] resize-none"
                 />
               </div>
 
-              {/* Primary Analyze Action Button */}
+              {/* Main Action Button */}
               <button
                 onClick={handleAnalyze}
                 disabled={loading}
-                className="w-full py-3.5 px-6 rounded-xl font-bold text-sm bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white transition-all flex items-center justify-center space-x-2 shadow-lg shadow-indigo-500/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
               >
                 {loading ? (
                   <>
                     <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Running DTW & Acoustic Grounding...</span>
+                    <span>Analyzing your recording...</span>
                   </>
                 ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    <span>Analyze Audio & Ground Flaws</span>
-                  </>
+                  <span>Analyze Speech</span>
                 )}
               </button>
 
-              {/* Quick Sample Audio Link */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Need sample audio to test?</span>
+              {/* Demo Sample Link */}
+              <div className="pt-2 border-t border-slate-100 text-center">
                 <button
                   onClick={handleLoadDemo}
                   disabled={loading}
-                  className="font-bold text-[#5B4DFB] hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-xs font-semibold text-[#5B4DFB] hover:underline cursor-pointer"
                 >
-                  ⚡ Try Sample Speech (Jobs L3)
+                  No audio on hand? Click here to test sample audio
                 </button>
               </div>
 
             </div>
 
-            {/* Quick Specs Callout */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-5">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Sliders className="h-3.5 w-3.5 text-[#5B4DFB]" />
-                Analytics Engine Specification
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Feature Hop</span>
-                  <span className="font-bold text-slate-700">10ms frame step</span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Pitch Scale</span>
-                  <span className="font-bold text-slate-700">Speaker Log-F0 Semitones</span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Energy Normalization</span>
-                  <span className="font-bold text-slate-700">Z-scored RMS dB</span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Warp Derivative</span>
-                  <span className="font-bold text-slate-700">db/dp ≥ 1.25 / ≤ 0.78</span>
-                </div>
-              </div>
+            {/* Simple "How it Works" Card */}
+            <div id="how-it-works" className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs text-xs">
+              <h3 className="font-bold text-slate-900 mb-2">How It Works</h3>
+              <ul className="space-y-1.5 text-slate-600">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-[#5B4DFB] font-bold">1.</span>
+                  <span>Aligns your recording with the standard speech using non-linear audio warping.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-[#5B4DFB] font-bold">2.</span>
+                  <span>Measures tempo shifts, silence gaps, pitch range, and volume consistency.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-[#5B4DFB] font-bold">3.</span>
+                  <span>Pinpoints exact seconds where delivery drifted and provides coaching advice.</span>
+                </li>
+              </ul>
             </div>
 
           </div>
 
-          {/* ======================================================== */}
-          {/* RIGHT COLUMN: Audio Player, Waveform & Results Area      */}
-          {/* ======================================================== */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
+          {/* ======================================================= */}
+          {/* RIGHT: Results & Feedback Card                          */}
+          {/* ======================================================= */}
+          <div className="lg:col-span-7 flex flex-col gap-4">
             
             {analysisData ? (
-              <>
-                {/* 1. Audio Preview & Interactive Waveform Scrubber Card */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4">
-                  
-                  {/* File Metadata Header */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#EEF0FF] text-[#5B4DFB] flex items-center justify-center font-bold">
-                        <Music className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                          {audioFile ? audioFile.name : 'Sample_Jobs_Level3_Flawed.wav'}
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            16 kHz Mono
-                          </span>
-                        </h3>
-                        <p className="text-xs text-slate-400 font-mono">
-                          Duration: {formatTime(maxTime)} • Transcoded: Universal FFmpeg
-                        </p>
-                      </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col gap-5">
+                
+                {/* 1. Audio Player Header */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        {audioFile ? audioFile.name : 'Sample_Recording.wav'}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-mono">
+                        {formatTime(currentTime)} / {formatTime(maxTime)}
+                      </p>
                     </div>
 
-                    {/* Speed Controls */}
-                    <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl">
+                    {/* Speed Selector */}
+                    <div className="flex items-center space-x-1 bg-white border border-slate-200 p-0.5 rounded-lg text-xs">
                       {[0.8, 1.0, 1.2].map(rate => (
                         <button
                           key={rate}
                           onClick={() => changePlaybackRate(rate)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                            playbackRate === rate
-                              ? 'bg-white text-[#5B4DFB] shadow-sm'
-                              : 'text-slate-500 hover:text-slate-900'
+                          className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                            playbackRate === rate ? 'bg-[#5B4DFB] text-white' : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
                           {rate}x
@@ -593,421 +503,335 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Playback Controls & Scrubber */}
-                  <div className="flex items-center space-x-4 pt-1">
+                  {/* Play/Pause & Scrubber */}
+                  <div className="flex items-center space-x-3">
                     <button
                       onClick={togglePlay}
-                      className="w-12 h-12 rounded-full bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform active:scale-95 cursor-pointer shrink-0"
+                      className="w-10 h-10 rounded-full bg-[#5B4DFB] hover:bg-[#4A3CE5] text-white flex items-center justify-center shrink-0 cursor-pointer shadow-sm transition-transform active:scale-95"
                     >
-                      {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 ml-0.5 fill-current" />}
+                      {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 ml-0.5 fill-current" />}
                     </button>
 
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between text-xs font-mono text-slate-600 mb-1.5">
-                        <span className="font-bold text-[#5B4DFB]">{formatTime(currentTime)}</span>
-                        <span className="text-slate-400">{formatTime(maxTime)}</span>
-                      </div>
+                    {/* Timeline Scrubber */}
+                    <div
+                      className="relative flex-1 h-8 bg-white border border-slate-200 rounded-lg overflow-hidden cursor-pointer"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const clickX = e.clientX - rect.left
+                        const targetSec = (clickX / rect.width) * maxTime
+                        seekToTime(targetSec)
+                      }}
+                    >
+                      {/* Flaw highlights on the timeline */}
+                      {analysisData.flaw_regions.map((flaw, idx) => {
+                        const leftPct = (flaw.start / maxTime) * 100
+                        const widthPct = Math.max(2.5, ((flaw.end - flaw.start) / maxTime) * 100)
+                        const cfg = FLAW_TYPES[flaw.flaw_type] || { bg: '#FEF2F2', color: '#EF4444' }
+                        const isHovered = activeFlawHover === idx
 
-                      {/* Interactive Waveform Scrubber with Flaw Regions Overlaid */}
+                        return (
+                          <div
+                            key={idx}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              seekToTime(flaw.start)
+                            }}
+                            onMouseEnter={() => setActiveFlawHover(idx)}
+                            onMouseLeave={() => setActiveFlawHover(null)}
+                            className={`absolute top-0 bottom-0 border-x transition-all z-10 ${
+                              isHovered ? 'ring-2 ring-[#5B4DFB]' : ''
+                            }`}
+                            style={{
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              backgroundColor: cfg.bg,
+                              borderColor: cfg.color
+                            }}
+                            title={`Jump to ${flaw.start}s`}
+                          />
+                        )
+                      })}
+
+                      {/* Playhead */}
                       <div
-                        className="relative w-full h-14 bg-slate-100 rounded-xl overflow-hidden cursor-pointer border border-slate-200"
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          const clickX = e.clientX - rect.left
-                          const targetSec = (clickX / rect.width) * maxTime
-                          seekToTime(targetSec)
-                        }}
+                        className="absolute top-0 bottom-0 w-0.5 bg-[#5B4DFB] z-20 pointer-events-none"
+                        style={{ left: `${(currentTime / maxTime) * 100}%` }}
                       >
-                        {/* Audio Waveform Bars Simulation */}
-                        <div className="absolute inset-0 flex items-center justify-between px-2 pointer-events-none opacity-40">
-                          {Array.from({ length: 80 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-1 rounded-full bg-slate-600 transition-all"
-                              style={{
-                                height: `${18 + Math.abs(Math.sin(i * 0.35)) * 48 + Math.cos(i * 0.8) * 15}%`
-                              }}
-                            />
-                          ))}
-                        </div>
-
-                        {/* Grounded Flaw Interval Highlighting Overlays */}
-                        {analysisData.flaw_regions.map((flaw, idx) => {
-                          const leftPct = (flaw.start / maxTime) * 100
-                          const widthPct = Math.max(2.0, ((flaw.end - flaw.start) / maxTime) * 100)
-                          const config = FLAW_CONFIG[flaw.flaw_type] || {
-                            bg: '#FEF2F2',
-                            border: '#F87171',
-                            text: '#DC2626',
-                            label: flaw.flaw_type
-                          }
-                          const isHovered = activeFlawHover === idx
-
-                          return (
-                            <div
-                              key={idx}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                seekToTime(flaw.start)
-                              }}
-                              onMouseEnter={() => setActiveFlawHover(idx)}
-                              onMouseLeave={() => setActiveFlawHover(null)}
-                              className={`absolute top-0 bottom-0 border-x transition-all flex flex-col justify-between p-1 z-10 cursor-pointer ${
-                                isHovered ? 'ring-2 ring-[#5B4DFB] brightness-95' : ''
-                              }`}
-                              style={{
-                                left: `${leftPct}%`,
-                                width: `${widthPct}%`,
-                                backgroundColor: config.bg,
-                                borderColor: config.border,
-                              }}
-                              title={`${config.label} [${flaw.time_span}] - Click to play`}
-                            >
-                              <span
-                                className="text-[9px] font-bold truncate leading-none"
-                                style={{ color: config.text }}
-                              >
-                                {config.label}
-                              </span>
-                              <span
-                                className="text-[8px] font-mono leading-none opacity-80"
-                                style={{ color: config.text }}
-                              >
-                                {flaw.start}s
-                              </span>
-                            </div>
-                          )
-                        })}
-
-                        {/* Playhead Vertical Scrub Bar */}
-                        <div
-                          className="absolute top-0 bottom-0 w-1 bg-[#5B4DFB] z-20 pointer-events-none shadow-[0_0_8px_rgba(91,77,251,0.8)]"
-                          style={{ left: `${(currentTime / maxTime) * 100}%` }}
-                        >
-                          <div className="w-3 h-3 -ml-1 rounded-full bg-[#5B4DFB] -mt-1 shadow-sm"></div>
-                        </div>
+                        <div className="w-2.5 h-2.5 -ml-1 rounded-full bg-[#5B4DFB] -mt-0.5"></div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Flaw Types Legend Chips */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-                    <span className="text-[11px] font-bold text-slate-400 mr-1">Flaws:</span>
-                    {Object.entries(FLAW_CONFIG).slice(0, 6).map(([key, item]) => (
-                      <span
-                        key={key}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${item.badge}`}
-                      >
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
-
+                  <p className="text-[11px] text-slate-500">
+                    💡 Colored sections on the timeline indicate moments where your delivery drifted. Click any color to listen.
+                  </p>
                 </div>
 
-                {/* 2. Audio Properties & Evaluative Rubric Scoring Card */}
-                <div id="rubrics" className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-5">
-                  
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                        <Award className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Audio Evaluation & Rubric Scores</h3>
-                        <p className="text-xs text-slate-500">Multimodal scoring across 5 speech delivery dimensions</p>
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                      Rubric Sum = 100%
-                    </span>
-                  </div>
+                {/* 2. Simple Tabs (Scores vs Flaws vs Charts) */}
+                <div className="flex border-b border-slate-200">
+                  <button
+                    onClick={() => setActiveTab('scores')}
+                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'scores'
+                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    Overall Scores
+                  </button>
 
-                  {/* Overall Quality Score Big Widget */}
-                  <div className="bg-gradient-to-r from-[#F6F8FC] to-[#EEF0FF]/40 rounded-2xl p-5 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center space-x-4">
-                      {/* Circular Score Badge */}
-                      <div className="relative w-18 h-18 rounded-2xl bg-white border-2 border-[#5B4DFB] flex flex-col items-center justify-center shadow-md shadow-indigo-500/10 shrink-0">
-                        <span className="text-2xl font-black text-[#5B4DFB] leading-none">
-                          {analysisData.scores.overall}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">/ 100</span>
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Overall Delivery Score</span>
-                        <h4 className="text-lg font-extrabold text-slate-900 mt-0.5">
-                          {analysisData.scores.overall >= 88 ? 'Exemplary Delivery' :
-                           analysisData.scores.overall >= 70 ? 'Competent Delivery' :
-                           analysisData.scores.overall >= 50 ? 'Noticeably Flawed' : 'Egregious Delivery'}
-                        </h4>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Acoustic baseline alignment correlation: <span className="font-mono font-bold text-slate-700">ρ = 0.854</span>
-                        </p>
-                      </div>
-                    </div>
+                  <button
+                    onClick={() => setActiveTab('flaws')}
+                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'flaws'
+                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <ListFilter className="w-3.5 h-3.5" />
+                    Moments to Improve ({analysisData.flaw_regions.length})
+                  </button>
 
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
+                  <button
+                    onClick={() => setActiveTab('charts')}
+                    className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'charts'
+                        ? 'border-[#5B4DFB] text-[#5B4DFB]'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <LineChart className="w-3.5 h-3.5" />
+                    Pitch & Pace Curves
+                  </button>
+                </div>
+
+                {/* TAB 1: OVERALL SCORES */}
+                {activeTab === 'scores' && (
+                  <div className="flex flex-col gap-4">
+                    {/* Big Score Card */}
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-16 h-16 rounded-xl bg-white border-2 border-[#5B4DFB] flex flex-col items-center justify-center shrink-0 shadow-2xs">
+                          <span className="text-2xl font-black text-[#5B4DFB] leading-none">
+                            {analysisData.scores.overall}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">/ 100</span>
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                            Overall Delivery Rating
+                          </span>
+                          <h4 className="text-base font-extrabold text-slate-900">
+                            {analysisData.scores.overall >= 88 ? 'Near Perfect Delivery' :
+                             analysisData.scores.overall >= 70 ? 'Competent Delivery' :
+                             analysisData.scores.overall >= 50 ? 'Needs Attention' : 'Noticeably Flawed'}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {analysisData.flaw_regions.length === 0
+                              ? 'Smooth cadence and natural pauses throughout.'
+                              : `${analysisData.flaw_regions.length} area(s) detected where delivery drifted.`}
+                          </p>
+                        </div>
+                      </div>
+
                       <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                        analysisData.scores.overall >= 88 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        analysisData.scores.overall >= 70 ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                        analysisData.scores.overall >= 50 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                        'bg-rose-50 text-rose-700 border-rose-200'
+                        analysisData.scores.overall >= 70
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
                       }`}>
-                        Tier {analysisData.flaw_regions.length <= 1 ? 'L1-L2' : analysisData.flaw_regions.length <= 3 ? 'L3-L4' : 'L5-L6'}
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">
-                        {analysisData.flaw_regions.length} grounded flaw interval{analysisData.flaw_regions.length !== 1 ? 's' : ''}
+                        Grade {analysisData.scores.overall >= 88 ? 'A' : analysisData.scores.overall >= 70 ? 'B+' : 'C'}
                       </span>
                     </div>
-                  </div>
 
-                  {/* 5 Subscore Rubric Bars */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    <RubricCard
-                      label="Pacing (Tempo Stability)"
-                      score={analysisData.scores.pacing}
-                      weight="25%"
-                      description="DTW non-linear warping path derivative stability"
-                      color="bg-rose-500"
-                    />
-                    <RubricCard
-                      label="Pauses (Syntactic Cadence)"
-                      score={analysisData.scores.pauses}
-                      weight="20%"
-                      description="Clause boundary silence ratio vs baseline"
-                      color="bg-amber-500"
-                    />
-                    <RubricCard
-                      label="Pitch Variation (Inflection)"
-                      score={analysisData.scores.pitch_variation}
-                      weight="20%"
-                      description="Speaker log-F0 dynamic semitone variance"
-                      color="bg-purple-500"
-                    />
-                    <RubricCard
-                      label="Energy Projection (Dynamics)"
-                      score={analysisData.scores.energy}
-                      weight="15%"
-                      description="Z-scored RMS intensity dynamic range"
-                      color="bg-sky-500"
-                    />
-                    <div className="sm:col-span-2">
-                      <RubricCard
-                        label="Clarity & Articulation (HNR)"
-                        score={analysisData.scores.clarity}
-                        weight="20%"
-                        description="Harmonics-to-noise ratio and MFCC spectral stability"
-                        color="bg-emerald-500"
+                    {/* 5 Simple Metric Bars */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <SimpleScoreBar
+                        title="Pacing & Speed"
+                        score={analysisData.scores.pacing}
+                        hint="Consistency in words per minute"
+                        color="bg-rose-500"
                       />
+                      <SimpleScoreBar
+                        title="Pauses & Silence"
+                        score={analysisData.scores.pauses}
+                        hint="Natural breaks between thoughts"
+                        color="bg-amber-500"
+                      />
+                      <SimpleScoreBar
+                        title="Pitch & Melody"
+                        score={analysisData.scores.pitch_variation}
+                        hint="Vocal inflection and emphasis"
+                        color="bg-purple-500"
+                      />
+                      <SimpleScoreBar
+                        title="Vocal Projection"
+                        score={analysisData.scores.energy}
+                        hint="Steadiness in speech volume"
+                        color="bg-sky-500"
+                      />
+                      <div className="sm:col-span-2">
+                        <SimpleScoreBar
+                          title="Articulation & Clarity"
+                          score={analysisData.scores.clarity}
+                          hint="Clean speech without slurring"
+                          color="bg-emerald-500"
+                        />
+                      </div>
                     </div>
                   </div>
+                )}
 
-                </div>
-
-                {/* 3. Multi-Track Time-Series Alignment Curves */}
-                <div id="time-series" className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-[#EEF0FF] text-[#5B4DFB] flex items-center justify-center font-bold">
-                        <TrendingUp className="h-4 w-4" />
+                {/* TAB 2: MOMENTS TO IMPROVE */}
+                {activeTab === 'flaws' && (
+                  <div className="space-y-3">
+                    {analysisData.flaw_regions.length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 text-xs">
+                        🎉 No major flaws detected! Your delivery aligns well with the reference speaker.
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Acoustic Time-Series Footprint</h3>
-                        <p className="text-xs text-slate-500">Continuous 10ms feature trajectories non-linearly aligned</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3 text-xs font-semibold">
-                      <span className="flex items-center gap-1.5 text-[#5B4DFB]">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#5B4DFB]"></span> Candidate Audio
-                      </span>
-                      <span className="flex items-center gap-1.5 text-emerald-600">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span> Gold Reference
-                      </span>
-                    </div>
-                  </div>
+                    ) : (
+                      analysisData.flaw_regions.map((flaw, idx) => {
+                        const cfg = FLAW_TYPES[flaw.flaw_type] || {
+                          label: flaw.title || flaw.flaw_type,
+                          badge: 'bg-red-50 text-red-700 border-red-200',
+                          simpleExplain: flaw.perceptual_impact,
+                          simpleTip: flaw.actionable_tip
+                        }
+                        const isHovered = activeFlawHover === idx
 
-                  {/* Track 1: Pitch Dynamic Contour */}
-                  <TrackChart
-                    title="F0 Pitch Dynamic Contour (Speaker-Normalized Semitones)"
-                    unit="semitones"
-                    maxTime={maxTime}
-                    currentTime={currentTime}
-                    pSeries={analysisData.time_series.participant.pitch}
-                    bSeries={analysisData.time_series.baseline.pitch}
-                    pTimes={analysisData.time_series.participant.times}
-                    bTimes={analysisData.time_series.baseline.times}
-                    flaws={analysisData.flaw_regions}
-                    activeFlawHover={activeFlawHover}
-                    yMin={-8}
-                    yMax={8}
-                    onSeek={seekToTime}
-                  />
-
-                  {/* Track 2: Vocal Energy & Projection */}
-                  <TrackChart
-                    title="Vocal Energy & Projection (Z-Scored RMS dB)"
-                    unit="z-score"
-                    maxTime={maxTime}
-                    currentTime={currentTime}
-                    pSeries={analysisData.time_series.participant.energy}
-                    bSeries={analysisData.time_series.baseline.energy}
-                    pTimes={analysisData.time_series.participant.times}
-                    bTimes={analysisData.time_series.baseline.times}
-                    flaws={analysisData.flaw_regions}
-                    activeFlawHover={activeFlawHover}
-                    yMin={-3.0}
-                    yMax={2.5}
-                    onSeek={seekToTime}
-                  />
-
-                  {/* Track 3: Local Speech Rate */}
-                  <TrackChart
-                    title="Cadence & Speech Rate (Syllables / Second)"
-                    unit="syl/s"
-                    maxTime={maxTime}
-                    currentTime={currentTime}
-                    pSeries={analysisData.time_series.participant.rate}
-                    bSeries={analysisData.time_series.baseline.rate}
-                    pTimes={analysisData.time_series.participant.times}
-                    bTimes={analysisData.time_series.baseline.times}
-                    flaws={analysisData.flaw_regions}
-                    activeFlawHover={activeFlawHover}
-                    yMin={0.0}
-                    yMax={7.0}
-                    onSeek={seekToTime}
-                  />
-                </div>
-
-                {/* 4. Grounded Delivery Flaw Diagnoses & Coach Tips */}
-                <div id="flaws" className="bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                        <AlertTriangle className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Grounded Temporal Flaw Diagnoses</h3>
-                        <p className="text-xs text-slate-500">Deterministic acoustic evidence with actionable coaching</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
-                      {analysisData.flaw_regions.length} Detected
-                    </span>
-                  </div>
-
-                  <div className="space-y-3.5 max-h-[640px] overflow-y-auto pr-1">
-                    {analysisData.flaw_regions.map((flaw, idx) => {
-                      const config = FLAW_CONFIG[flaw.flaw_type] || {
-                        bg: '#FEF2F2',
-                        border: '#F87171',
-                        text: '#DC2626',
-                        label: flaw.flaw_type,
-                        badge: 'bg-red-50 text-red-700 border-red-200'
-                      }
-                      const isHovered = activeFlawHover === idx
-
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => seekToTime(flaw.start)}
-                          onMouseEnter={() => setActiveFlawHover(idx)}
-                          onMouseLeave={() => setActiveFlawHover(null)}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer bg-slate-50/60 hover:bg-slate-50 ${
-                            isHovered ? 'ring-2 ring-[#5B4DFB] border-[#5B4DFB] shadow-sm' : 'border-slate-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${config.badge}`}>
-                              {flaw.title || config.label}
-                            </span>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-xs font-mono font-semibold text-slate-500 flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                {flaw.time_span}
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => seekToTime(flaw.start)}
+                            onMouseEnter={() => setActiveFlawHover(idx)}
+                            onMouseLeave={() => setActiveFlawHover(null)}
+                            className={`p-3.5 rounded-xl border transition-all cursor-pointer bg-slate-50 hover:bg-white ${
+                              isHovered ? 'ring-2 ring-[#5B4DFB] border-[#5B4DFB]' : 'border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${cfg.badge}`}>
+                                {cfg.label}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  seekToTime(flaw.start)
-                                }}
-                                className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-[#5B4DFB] text-[10px] font-bold border border-slate-200 shadow-2xs"
-                              >
-                                Play Audio ▷
-                              </button>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs font-mono text-slate-500">
+                                  {flaw.time_span}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    seekToTime(flaw.start)
+                                  }}
+                                  className="text-xs font-bold text-[#5B4DFB] hover:underline"
+                                >
+                                  ▶ Listen
+                                </button>
+                              </div>
                             </div>
-                          </div>
 
-                          {flaw.words && (
-                            <p className="text-xs text-slate-700 italic mb-2.5 bg-white p-2 rounded-lg border border-slate-200 font-sans">
-                              "{flaw.words}"
+                            {flaw.words && (
+                              <p className="text-xs text-slate-800 italic bg-white p-2 rounded-lg border border-slate-200 mb-2">
+                                "{flaw.words}"
+                              </p>
+                            )}
+
+                            <p className="text-xs text-slate-600 mb-2">
+                              {cfg.simpleExplain || flaw.perceptual_impact}
                             </p>
-                          )}
 
-                          <div className="text-xs text-slate-700 mb-2.5 leading-relaxed">
-                            <span className="font-mono font-bold text-[#5B4DFB] bg-[#EEF0FF] px-1.5 py-0.5 rounded mr-1">
-                              {flaw.mathematical_rationale}
-                            </span>
-                            <span className="text-slate-600">{flaw.perceptual_impact}</span>
-                          </div>
-
-                          <div className="bg-[#EEF0FF]/80 border border-indigo-100 p-3 rounded-xl text-xs text-[#2C2096] flex items-start gap-2">
-                            <Info className="h-4 w-4 text-[#5B4DFB] shrink-0 mt-0.5" />
-                            <div>
-                              <strong className="text-[#5B4DFB]">Actionable Coach Tip:</strong>{' '}
-                              <span>{flaw.actionable_tip}</span>
+                            <div className="bg-[#F0EFFF] border border-indigo-100 p-2.5 rounded-lg text-xs text-indigo-900 flex items-start gap-1.5">
+                              <span className="font-bold text-[#5B4DFB]">Tip:</span>
+                              <span>{cfg.simpleTip || flaw.actionable_tip}</span>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    )}
                   </div>
+                )}
 
-                </div>
-              </>
+                {/* TAB 3: PITCH & PACE CURVES */}
+                {activeTab === 'charts' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
+                      <span className="text-slate-500">Compare your trajectory against the reference:</span>
+                      <div className="flex items-center space-x-3 font-semibold">
+                        <span className="flex items-center gap-1 text-[#5B4DFB]">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#5B4DFB]"></span> You
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-600">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Reference
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Chart 1: Pitch */}
+                    <SimpleChart
+                      title="Pitch Variation (Inflection & Tone)"
+                      unit="semitones"
+                      maxTime={maxTime}
+                      currentTime={currentTime}
+                      pSeries={analysisData.time_series.participant.pitch}
+                      bSeries={analysisData.time_series.baseline.pitch}
+                      pTimes={analysisData.time_series.participant.times}
+                      bTimes={analysisData.time_series.baseline.times}
+                      yMin={-8}
+                      yMax={8}
+                      onSeek={seekToTime}
+                    />
+
+                    {/* Chart 2: Volume */}
+                    <SimpleChart
+                      title="Speaking Volume & Energy"
+                      unit="loudness"
+                      maxTime={maxTime}
+                      currentTime={currentTime}
+                      pSeries={analysisData.time_series.participant.energy}
+                      bSeries={analysisData.time_series.baseline.energy}
+                      pTimes={analysisData.time_series.participant.times}
+                      bTimes={analysisData.time_series.baseline.times}
+                      yMin={-3.0}
+                      yMax={2.5}
+                      onSeek={seekToTime}
+                    />
+
+                    {/* Chart 3: Cadence */}
+                    <SimpleChart
+                      title="Speaking Speed Over Time"
+                      unit="syllables / sec"
+                      maxTime={maxTime}
+                      currentTime={currentTime}
+                      pSeries={analysisData.time_series.participant.rate}
+                      bSeries={analysisData.time_series.baseline.rate}
+                      pTimes={analysisData.time_series.participant.times}
+                      bTimes={analysisData.time_series.baseline.times}
+                      yMin={0.0}
+                      yMax={7.0}
+                      onSeek={seekToTime}
+                    />
+                  </div>
+                )}
+
+              </div>
             ) : (
-              /* ======================================================== */
-              /* Initial Empty State (AudioEnhancer Style)               */
-              /* ======================================================== */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-12 text-center flex flex-col items-center justify-center min-h-[500px]">
-                
-                {/* Illustration / Graphic */}
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-[#EEF0FF] to-[#E0DCFF] border border-indigo-100 flex items-center justify-center text-[#5B4DFB] mb-5 shadow-sm">
-                  <Activity className="h-10 w-10 animate-pulse" />
+              /* Simple Initial Empty State */
+              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center flex flex-col items-center justify-center min-h-[420px] shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-[#F0EFFF] text-[#5B4DFB] flex items-center justify-center mb-4">
+                  <Mic className="h-7 w-7" />
                 </div>
-
-                <h2 className="text-xl font-extrabold text-slate-900 mb-2">
-                  Ready for Contrastive Speech Evaluation
-                </h2>
-                <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
-                  Upload an audio file on the left or test our pre-processed keynote benchmark with one click to inspect acoustic stress points, DTW tempo curves, and grounded flaws.
+                <h3 className="text-lg font-bold text-slate-900 mb-1">
+                  Ready to listen!
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
+                  Upload an audio file on the left or try our sample speech to see your delivery score, timeline flaws, and coach tips.
                 </p>
-
-                {/* 3 Step Guide Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg mb-8 text-left text-xs">
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="font-bold text-[#5B4DFB] block mb-1">1. Choose File</span>
-                    <span className="text-slate-500">M4A, MP3, WAV or AAC speech audio.</span>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="font-bold text-[#5B4DFB] block mb-1">2. Select Reference</span>
-                    <span className="text-slate-500">Steve Jobs, MLK, JFK, or Churchill.</span>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="font-bold text-[#5B4DFB] block mb-1">3. Instant Insights</span>
-                    <span className="text-slate-500">DTW contour + rubric scoring + flaw grounding.</span>
-                  </div>
-                </div>
-
-                {/* Primary CTA */}
                 <button
                   onClick={handleLoadDemo}
                   disabled={loading}
-                  className="px-6 py-3 rounded-xl font-bold text-sm bg-[#5B4DFB] text-white hover:bg-[#4A3CE5] transition-all flex items-center space-x-2 shadow-lg shadow-indigo-500/25 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#5B4DFB] text-white hover:bg-[#4A3CE5] transition-colors cursor-pointer"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span>Load Steve Jobs Keynote Demo</span>
+                  Load Sample Speech
                 </button>
-
               </div>
             )}
 
@@ -1017,16 +841,14 @@ export default function App() {
 
       </main>
 
-      {/* Footer (AudioEnhancer Clean Style) */}
-      <footer className="border-t border-slate-200 bg-white py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500">
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-800">SpeechFlaw</span>
-            <span>•</span>
-            <span>Multimodal AI Hackathon 2026 — Track C</span>
+      {/* Clean Human Footer */}
+      <footer id="team" className="border-t border-slate-200 bg-white py-5 mt-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+          <div>
+            <span className="font-bold text-slate-800">SpeechFlaw</span> • Multimodal AI Hackathon 2026 (Track C)
           </div>
-          <div className="font-mono text-slate-600 font-medium">
-            Team: Priyanshu Singh, Aarav Sharma, Rohan Verma, Ananya Iyer
+          <div>
+            Built with ❤️ by <span className="font-semibold text-slate-700">Priyanshu Singh, Aarav Sharma, Rohan Verma, and Ananya Iyer</span>
           </div>
         </div>
       </footer>
@@ -1035,30 +857,25 @@ export default function App() {
   )
 }
 
-function RubricCard({ label, score, weight, description, color }) {
+function SimpleScoreBar({ title, score, hint, color }) {
   return (
-    <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-3.5 flex flex-col justify-between">
-      <div>
-        <div className="flex justify-between items-center text-xs mb-1">
-          <span className="text-slate-800 font-bold">{label}</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 font-mono text-[10px]">Weight {weight}</span>
-            <span className="font-mono font-extrabold text-slate-900">{score}</span>
-          </div>
-        </div>
-        <p className="text-[11px] text-slate-400 mb-2.5">{description}</p>
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+      <div className="flex justify-between items-center text-xs mb-1">
+        <span className="font-bold text-slate-800">{title}</span>
+        <span className="font-extrabold text-slate-900">{score}/100</span>
       </div>
+      <p className="text-[11px] text-slate-400 mb-2">{hint}</p>
       <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} rounded-full transition-all duration-500`}
           style={{ width: `${Math.max(5, score)}%` }}
-        ></div>
+        />
       </div>
     </div>
   )
 }
 
-function TrackChart({
+function SimpleChart({
   title,
   unit,
   maxTime,
@@ -1067,14 +884,12 @@ function TrackChart({
   bSeries,
   pTimes,
   bTimes,
-  flaws,
-  activeFlawHover,
   yMin,
   yMax,
   onSeek
 }) {
-  const chartHeight = 85
-  const chartWidth = 720
+  const chartHeight = 70
+  const chartWidth = 600
 
   const scaleX = (t) => (t / maxTime) * chartWidth
   const scaleY = (v) => {
@@ -1084,7 +899,6 @@ function TrackChart({
     return chartHeight - ratio * chartHeight
   }
 
-  // Build SVG path strings
   const buildSvgPath = (times, values) => {
     let d = ''
     let isDrawing = false
@@ -1109,14 +923,14 @@ function TrackChart({
   const bPath = buildSvgPath(bTimes, bSeries)
 
   return (
-    <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-3">
-      <div className="flex justify-between items-center text-xs text-slate-500 mb-2 font-mono">
-        <span className="text-slate-800 font-sans font-bold text-xs">{title}</span>
-        <span className="text-[11px] text-slate-400">[{unit}]</span>
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+      <div className="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+        <span className="text-slate-800 font-bold">{title}</span>
+        <span className="text-[10px] text-slate-400">[{unit}]</span>
       </div>
 
       <div
-        className="relative w-full h-[85px] cursor-pointer overflow-hidden rounded-lg bg-white border border-slate-200"
+        className="relative w-full h-[70px] cursor-pointer overflow-hidden rounded bg-white border border-slate-200"
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           const clickX = e.clientX - rect.left
@@ -1125,38 +939,16 @@ function TrackChart({
         }}
       >
         <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" className="w-full h-full">
-          {/* Subtle grid line */}
-          <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="#E2E8F0" strokeDasharray="3 3" />
-          
-          {/* Shaded Flaw Regions on this chart */}
-          {flaws.map((flaw, idx) => {
-            const rx = scaleX(flaw.start)
-            const rw = Math.max(3, scaleX(flaw.end) - rx)
-            const config = FLAW_CONFIG[flaw.flaw_type] || { border: '#EF4444' }
-            const isHovered = activeFlawHover === idx
+          {/* Subtle center line */}
+          <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="#F1F5F9" />
 
-            return (
-              <rect
-                key={idx}
-                x={rx}
-                y="0"
-                width={rw}
-                height={chartHeight}
-                fill={isHovered ? 'rgba(91, 77, 251, 0.12)' : 'rgba(239, 68, 68, 0.06)'}
-                stroke={config.border}
-                strokeWidth={isHovered ? '1.5' : '0.8'}
-                strokeDasharray="2 2"
-              />
-            )
-          })}
+          {/* Reference Curve (Green) */}
+          <path d={bPath} fill="none" stroke="#10B981" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
 
-          {/* Baseline Reference Curve (Emerald) */}
-          <path d={bPath} fill="none" stroke="#10B981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+          {/* You Curve (Purple) */}
+          <path d={pPath} fill="none" stroke="#5B4DFB" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round" />
 
-          {/* Candidate Trajectory Curve (AudioEnhancer Indigo) */}
-          <path d={pPath} fill="none" stroke="#5B4DFB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-
-          {/* Playhead vertical line */}
+          {/* Playhead */}
           <line
             x1={scaleX(currentTime)}
             y1="0"
@@ -1164,7 +956,6 @@ function TrackChart({
             y2={chartHeight}
             stroke="#1E293B"
             strokeWidth="1.5"
-            strokeDasharray="2 1"
           />
         </svg>
       </div>
