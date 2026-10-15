@@ -52,6 +52,17 @@ if os.path.exists("data/raw"):
 if os.path.exists("data/dataset"):
     app.mount("/static/dataset", StaticFiles(directory="data/dataset"), name="static_dataset")
 
+@app.on_event("startup")
+def prewarm_baselines():
+    """Pre-extracts baseline features on server boot so user requests are instantaneous."""
+    for b in BASELINES_CATALOG:
+        wav_path = f"data/raw/{b['id']}.wav"
+        if os.path.exists(wav_path):
+            try:
+                extract_speech_features(wav_path, use_cache=True)
+            except Exception as e:
+                print(f"Prewarm {b['id']} failed: {e}")
+
 BASELINES_CATALOG = [
     {
         "id": "stay_hungry",

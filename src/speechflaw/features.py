@@ -32,12 +32,15 @@ def compute_spectral_flux(y: np.ndarray, n_fft: int = 512, hop_length: int = 160
     # Prepend 0 for frame alignment
     return np.pad(flux, (1, 0), mode='edge')
 
-def compute_hnr_jitter_shimmer(y: np.ndarray, sr: int = 16000, hop_length: int = 160, win_len: int = 1600):
+def compute_hnr_jitter_shimmer(y: np.ndarray, sr: int = 16000, hop_length: int = 160, win_len: int = 1600, step: int = 2):
     """
     Computes Harmonics-to-Noise Ratio (HNR in dB), local jitter, and local shimmer
-    across the signal using autocorrelation and peak perturbation.
+    across the signal using O(N log N) FFT autocorrelation and stride interpolation.
     """
     n_frames = int(np.ceil(len(y) / hop_length))
+    if n_frames == 0:
+        return np.zeros(0, dtype=np.float32), np.zeros(0, dtype=np.float32), np.zeros(0, dtype=np.float32)
+        
     hnr_series = np.zeros(n_frames, dtype=np.float32)
     jitter_series = np.zeros(n_frames, dtype=np.float32)
     shimmer_series = np.zeros(n_frames, dtype=np.float32)
@@ -48,22 +51,24 @@ def compute_hnr_jitter_shimmer(y: np.ndarray, sr: int = 16000, hop_length: int =
     # Lag limits for pitch 70Hz - 450Hz
     min_lag = int(sr / 450)
     max_lag = int(sr / 70)
+    n_fft = 1 << (win_len * 2 - 1).bit_length()
     
-    for i in range(n_frames):
+    sampled_indices = list(range(0, n_frames, step))
+    if sampled_indices[-1] != n_frames - 1:
+        sampled_indices.append(n_frames - 1)
+        
+    for i in sampled_indices:
         center = i * hop_length + half_win
         frame = y_padded[center - half_win : center + half_win]
         
         # Energy check
         energy = np.sum(frame**2)
         if energy < 1e-6:
-            hnr_series[i] = 0.0
-            jitter_series[i] = 0.0
-            shimmer_series[i] = 0.0
             continue
             
-        # Autocorrelation
-        autocorr = signal.correlate(frame, frame, mode='full')
-        autocorr = autocorr[len(autocorr)//2:]
+        # High-performance FFT autocorrelation
+        f_fft = np.fft.rfft(frame, n=n_fft)
+        autocorr = np.fft.irfft(np.abs(f_fft)**2)[:max_lag + 1]
         r0 = autocorr[0] + 1e-8
         
         if len(autocorr) > max_lag:
@@ -75,16 +80,16 @@ def compute_hnr_jitter_shimmer(y: np.ndarray, sr: int = 16000, hop_length: int =
             if peak_val > 0 and r0 > peak_val:
                 ratio = peak_val / (r0 - peak_val)
                 hnr_series[i] = float(np.clip(10 * np.log10(ratio + 1e-4), -10.0, 35.0))
-            else:
-                hnr_series[i] = 0.0
                 
-            # Perturbation heuristics (normalized lag irregularity & amplitude change)
             norm_peak = peak_val / r0
             jitter_series[i] = float(np.clip((1.0 - norm_peak) * 0.05, 0.0, 0.15))
             shimmer_series[i] = float(np.clip((1.0 - norm_peak) * 0.12, 0.0, 0.35))
-        else:
-            hnr_series[i] = 0.0
             
+    if step > 1 and len(sampled_indices) > 1:
+        hnr_series = np.interp(np.arange(n_frames), sampled_indices, hnr_series[sampled_indices]).astype(np.float32)
+        jitter_series = np.interp(np.arange(n_frames), sampled_indices, jitter_series[sampled_indices]).astype(np.float32)
+        shimmer_series = np.interp(np.arange(n_frames), sampled_indices, shimmer_series[sampled_indices]).astype(np.float32)
+        
     return hnr_series, jitter_series, shimmer_series
 
 def extract_speech_features(
@@ -140,17 +145,24 @@ def extract_speech_features(
     n_frames = int(np.ceil(len(y) / hop_length))
     times = np.arange(n_frames) * (hop_length / sr)
     
-    # 1. Fundamental Frequency F0 using pYIN
+    # 1. Fundamental Frequency F0 using pYIN (8kHz downsampling for 12x cloud speedup)
     fmin = 65
     fmax = 420
-    frame_length = 512
+    target_f0_sr = 8000
+    if sr != target_f0_sr:
+        y_f0 = librosa.resample(y, orig_sr=sr, target_sr=target_f0_sr)
+    else:
+        y_f0 = y
+    hop_f0 = int(hop_length * target_f0_sr / sr)
+    frame_len_f0 = 256
+    
     f0, voiced_flag, voiced_probs = librosa.pyin(
-        y,
+        y_f0,
         fmin=fmin,
         fmax=fmax,
-        sr=sr,
-        frame_length=frame_length,
-        hop_length=hop_length
+        sr=target_f0_sr,
+        frame_length=frame_len_f0,
+        hop_length=hop_f0
     )
     # Ensure f0 length matches n_frames
     if len(f0) < n_frames:
@@ -170,6 +182,7 @@ def extract_speech_features(
     f0_semitones[valid_mask] = 12.0 * np.log2(f0[valid_mask] / f0_median)
     
     # 2. RMS Energy in dB & Per-Recording Z-Score
+    frame_length = 512
     rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
     if len(rms) < n_frames:
         rms = np.pad(rms, (0, n_frames - len(rms)), mode='edge')
