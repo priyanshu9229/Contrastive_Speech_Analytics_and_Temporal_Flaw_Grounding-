@@ -11,7 +11,10 @@ import difflib
 import numpy as np
 import soundfile as sf
 import librosa
-import jiwer
+try:
+    import jiwer
+except ImportError:
+    jiwer = None
 
 _WHISPER_MODEL = None
 
@@ -81,6 +84,14 @@ def transcribe_audio_asr(audio_path: str, sr: int = 16000) -> tuple[str, list[di
 
 def compute_wer(reference: str, hypothesis: str) -> float:
     """Computes Word Error Rate between reference transcript and ASR hypothesis."""
+    if jiwer is None:
+        r_words = re.sub(r'[^\w\s]', '', reference.lower()).split()
+        h_words = re.sub(r'[^\w\s]', '', hypothesis.lower()).split()
+        if not r_words:
+            return 0.0 if not h_words else 1.0
+        matcher = difflib.SequenceMatcher(None, r_words, h_words)
+        return float(1.0 - matcher.ratio())
+
     trans = jiwer.Compose([
         jiwer.ToLowerCase(),
         jiwer.RemovePunctuation(),
