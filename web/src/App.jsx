@@ -21,17 +21,17 @@ import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import Plotly from 'plotly.js-dist-min'
 import demoData from './demoData.json'
 
-const PUBLIC_TUNNEL_URL = 'https://5c6ef9a8b330e1.lhr.life'
-const API_BASE = import.meta.env.VITE_API_URL || PUBLIC_TUNNEL_URL
+const DEFAULT_CLOUD_API = 'https://contrastive-speech-analytics-and.onrender.com'
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_CLOUD_API
 
-// Resilient API fetch that automatically falls back across origins (custom -> env -> public tunnel -> localhost)
+// Resilient API fetch that automatically falls back across origins (custom -> env -> cloud Render -> localhost)
 async function apiFetch(endpoint, options = {}) {
   const custom = typeof window !== 'undefined' ? (localStorage.getItem('speechflaw_api_url') || '').trim().replace(/\/+$/, '') : ''
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   const candidates = [
     custom,
     import.meta.env.VITE_API_URL,
-    PUBLIC_TUNNEL_URL,
+    DEFAULT_CLOUD_API,
     isLocal ? `http://${window.location.hostname}:8000` : null,
     'http://127.0.0.1:8000',
     'http://localhost:8000'
@@ -207,7 +207,7 @@ export default function App() {
   const [hoveredFlawIndex, setHoveredFlawIndex] = useState(null)
   const [activeFlawIndex, setActiveFlawIndex] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
-  const [apiHost, setApiHost] = useState(PUBLIC_TUNNEL_URL)
+  const [apiHost, setApiHost] = useState(DEFAULT_CLOUD_API)
   const [apiOnline, setApiOnline] = useState(true)
   const [customUrlInput, setCustomUrlInput] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('speechflaw_api_url') || '' : ''))
   const [isUrlSaved, setIsUrlSaved] = useState(false)
